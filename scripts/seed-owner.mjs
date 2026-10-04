@@ -1,4 +1,4 @@
-import { firebaseAdmin } from '../api/_firebase.js';
+import { firebaseAdmin } from '../server/_firebase.js';
 
 const email = process.env.OWNER_EMAIL?.trim();
 const name = process.env.ORGANIZATION_NAME?.trim() || 'Recruiter Team';

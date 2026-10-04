@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/*.js": {
+    "api/router.js": {
       "maxDuration": 60
     }
   },
@@ -17,6 +17,60 @@
           "value": "strict-origin-when-cross-origin"
         }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/assessment",
+      "destination": "/api/router?endpoint=assessment"
+    },
+    {
+      "source": "/api/candidate",
+      "destination": "/api/router?endpoint=candidate"
+    },
+    {
+      "source": "/api/extract",
+      "destination": "/api/router?endpoint=extract"
+    },
+    {
+      "source": "/api/generate-questions",
+      "destination": "/api/router?endpoint=generate-questions"
+    },
+    {
+      "source": "/api/invitations",
+      "destination": "/api/router?endpoint=invitations"
+    },
+    {
+      "source": "/api/invite",
+      "destination": "/api/router?endpoint=invite"
+    },
+    {
+      "source": "/api/job",
+      "destination": "/api/router?endpoint=job"
+    },
+    {
+      "source": "/api/jobs",
+      "destination": "/api/router?endpoint=jobs"
+    },
+    {
+      "source": "/api/me",
+      "destination": "/api/router?endpoint=me"
+    },
+    {
+      "source": "/api/parse-jd",
+      "destination": "/api/router?endpoint=parse-jd"
+    },
+    {
+      "source": "/api/public-config",
+      "destination": "/api/router?endpoint=public-config"
+    },
+    {
+      "source": "/api/report",
+      "destination": "/api/router?endpoint=report"
+    },
+    {
+      "source": "/api/requirements",
+      "destination": "/api/router?endpoint=requirements"
     }
   ]
 }

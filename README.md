@@ -2,6 +2,12 @@
 
 **Independent recruiter-only application.** Does not change either existing Student or Professional assessment. Step 4 adds secure candidate invitations, email OTP, timed exams with back navigation and server autosave, optional fullscreen, browser activity logs, a complete objective evidence report, and owner-controlled permanent deletion. Existing Steps 1–3 JDs, approved requirements and published questions remain usable.
 
+## IMPORTANT: Hobby-plan deployment fix (October 2026)
+
+This package replaces the previously uploaded Step 4 ZIP. The original had too many `api/*.js` files for Vercel Hobby's 12-function limit. This package uses **one** deployable function (`api/router.js`) and moves internal handlers into `server/`. Existing `/api/...` URLs continue to work through `vercel.json` rewrites. No new Firebase collections, environment variables, domains or accounts are necessary compared with Step 4.
+
+**GitHub update (critical):** Upload all files from this ZIP **and delete ALL previous `api/*.js` files except the NEW `api/router.js`**. Uploading a ZIP's contents through GitHub's normal uploader adds/replaces files, but **does not delete old files**. If the old API files remain, Vercel will still count them and the deployment will fail. The easiest no-install method: on your GitHub repository press **`.`** to open the web editor; delete the existing `api/` folder, upload/drag the new package's folder contents including `api/` and `server/`, commit all changes, then redeploy. Alternatively use GitHub's normal file editor to delete old API files one by one before uploading.
+
 ## Deploy using GitHub + Vercel (NO local Node.js required)
 
 1. Extract `recruiter-assessment-step4.zip`. In your **recruiter-only GitHub repository**, upload the **contents** of the extracted folder into the repository root and replace the existing files (`index.html`, `app.js`, `style.css`, `api/`, `lib/`, etc.). Keep existing Firebase and Vercel projects and the existing Student / Professional repository unchanged. Do not upload an outer `recruiter-assessment-step4` folder.
