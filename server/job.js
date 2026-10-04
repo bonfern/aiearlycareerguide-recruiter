@@ -14,6 +14,7 @@ export default async function handler(req, res) {
       id: snapshot.id, title: data.title, department: data.department, jdText: data.jdText,
       status: data.status, extraction: data.extraction || null,
       approvedRequirements: data.approvedRequirements || null, extractionSource: data.extractionSource || null,
+      assessmentFocusDraft: data.assessmentFocusDraft || null,assessmentFocusApproved: data.assessmentFocusApproved || null,
       createdAt: data.createdAt?.toDate?.()?.toISOString?.() || null
     }});
   } catch (error) { console.error('job API error', error); return res.status(500).json({error: 'Unable to load this job'}); }

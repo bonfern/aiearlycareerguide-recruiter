@@ -173,3 +173,45 @@ button:not(.secondary):not(.question-nav-item):hover:not(:disabled){background:#
 
 .question-nav-item{background:#fff!important;color:#375472!important;border-color:#bccce2!important}.question-nav-item.answered{background:#e0f5ec!important;color:#166148!important;border-color:#a8d8c4!important}.question-nav-item.current{background:#eef6fa!important;color:#083d59!important;border-color:#4e9db0!important;outline:2px solid #8ac9d2}
 .candidate-option:has(input:disabled){opacity:.83;cursor:progress}
+
+/* Assessment V2: recruiter-approved critical competencies and concise evidence profile */
+.focus-card{margin:12px 0;background:#fff}
+.focus-card .two-col{margin:12px 0}
+.focus-requirements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
+.focus-requirement{display:flex;align-items:flex-start;gap:8px;border:1px solid #dce8ef;padding:10px;border-radius:8px;font-size:13px;font-weight:500;line-height:1.5}
+.focus-requirement input{flex:none;width:18px;height:18px;margin:1px 0 0}
+.focus-question-label{font-weight:750;color:#087c84;margin:12px 0}
+#focus-count-note{font-weight:750}
+#focus-panel>.actions{margin-top:19px}
+.report-executive{border:1px solid #dfe9ef;border-radius:12px;padding:18px 20px;margin:18px 0;background:white}
+.report-executive h3{font-size:17px;margin:0 0 13px!important;color:#071d45}
+.report-executive h4{font-size:14px;margin:0 0 10px}
+.report-executive p{line-height:1.58}
+.report-highlights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:15px}
+.report-highlight{background:#f3f9f9;padding:15px;border-radius:9px}
+.report-highlight ul{margin:5px 0;padding-left:20px}
+.report-highlight li{margin:6px 0;line-height:1.5}
+.report-competency{padding:11px 0;border-bottom:1px solid #edf0f4}
+.report-competency:last-child{border-bottom:none}
+.report-competency-header{display:flex;justify-content:space-between;gap:15px;font-size:14px}
+.report-competency-header span{font-weight:800;white-space:nowrap}
+.report-progress{background:#e7f0f2;height:9px;border-radius:20px;margin:9px 0;overflow:hidden}
+.report-progress-fill{background:#087c84;height:9px;border-radius:20px}
+.report-competency p{font-size:13px;margin:5px 0!important}
+.report-appendix{border-top:2px solid #cfdee7;padding:20px 0;margin-top:25px}
+.report-appendix>summary{font-weight:800;font-size:17px;color:#071d45!important}
+.report-compact{padding:13px 17px;margin:11px 0;break-inside:avoid}
+.report-compact h4{font-size:13px!important;margin:0 0 6px!important}
+.report-compact p{font-size:12px;line-height:1.4!important;margin:4px 0!important}
+.report-compact ol{margin:5px 0 10px!important;font-size:12px;line-height:1.4!important}
+.report-compact li{padding:2px 5px!important}
+@media(max-width:700px){.focus-requirements,.report-highlights{grid-template-columns:1fr}.report-executive{padding:14px}.report-competency-header{align-items:flex-start}}
+@media print{
+  #report-content .report-executive{border-color:#e3e3e3;padding:11px;margin:9px 0}
+  #report-content .report-highlights{gap:8px}
+  #report-content .report-appendix{break-before:page}
+  #report-content .report-question{padding:9px;margin:9px 0}
+  #report-content .report-compact p,#report-content .report-compact li{font-size:10px!important}
+  #report-content .report-executive,#report-content .report-competency{break-inside:avoid}
+  #report-content .report-appendix>summary{display:none}
+}

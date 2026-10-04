@@ -3,6 +3,7 @@
 const handlers = {
   'assessment': () => import('../server/assessment.js'),
   'candidate': () => import('../server/candidate.js'),
+  'focus': () => import('../server/focus.js'),
   'extract': () => import('../server/extract.js'),
   'generate-questions': () => import('../server/generate-questions.js'),
   'invitations': () => import('../server/invitations.js'),

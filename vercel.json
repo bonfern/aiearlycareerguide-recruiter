@@ -29,6 +29,10 @@
       "destination": "/api/router?endpoint=candidate"
     },
     {
+      "source": "/api/focus",
+      "destination": "/api/router?endpoint=focus"
+    },
+    {
       "source": "/api/extract",
       "destination": "/api/router?endpoint=extract"
     },

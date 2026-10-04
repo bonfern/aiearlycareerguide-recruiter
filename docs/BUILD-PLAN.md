@@ -1,10 +1,11 @@
-# Recruiter assessment roadmap — current: Step 4 controlled pilot
+# Recruiter assessment roadmap — current: Assessment V2 pilot
 
-- Step 1 (complete): independent recruiter login, organisation-scoped Firestore and multiple-JD dashboard.
-- Step 2 (complete): JD extraction / approval, exact JD cache.
-- Step 3 (complete): editable 15/25/40-question sets and organisation-scoped published question reuse.
-- **Step 4 (this package):** 5-candidate-per-JD controlled pilot; Resend invitation email, one-time code and signed session; configurable server timer, autosaved answers, back navigation, shuffled questions/options, declared browser-monitoring events; full answer-by-answer report, competency evidence, timing and event log. Owner deletion.
-- **Step 5 (next):** Prepaid assessment packages 5/10/20/50/100/200+, coupon codes and Razorpay webhook verification. Atomic credit reservation on candidate start, idempotent consumption on first start, release of unused/expired invitations, ledger/refunds and admin pricing/coupon controls. Replace `RECRUITER_PILOT_MODE` gate with server-side credit gating and anti-overspending transactions.
-- Step 6 (pre-launch): consent/privacy review; automated retention purge, audit controls; broader question bank and fairness/reliability pilots, usability and load testing, robust retry queues, candidate accommodations and independent security review.
+- Step 1 (complete): independent Recruiter application, separate GitHub/Vercel/Firebase, recruiter login and multiple-JD dashboard.
+- Step 2 (complete): JD upload, AI requirement extraction, recruiter requirement approval, exact-JD extraction caching.
+- Step 3 (complete): legacy 15/25/40 assessment generator, publish/lock, approved-question cache (retained for existing assessments).
+- Step 4 (complete): 5-candidate-per-JD controlled pilot, Resend invitation email, OTP, timed candidate assessment, autosaved answers, back navigation, browser-integrity event log, original evidence reports.
+- **Assessment V2 (this package):** New 20/30/40 format, most-critical-competency proposal and recruiter approval, requirement mappings and question allocation, separate versioned organisation-scoped V2 question cache, grouped evidence report, interview prompts and compact full evidence appendix. Legacy V1 assessments and reports remain accessible unchanged.
+- **Next: Payments:** Prepaid packages 5/10/20/50/100/custom, coupon codes, Razorpay webhook verification, idempotent candidate-start credit charging, expired/unused reservation release, transactions and admin pricing management. Pilot mode remains enabled until payment checks pass.
+- Pre-launch: consent/privacy review, automated data retention, fairness and reliability pilot, candidate accommodations, expanded item banks, operational testing and security review.
 
-Payment and hiring decisions are **outside** the Step 4 pilot. Do not activate unrestricted invitations or claim webcam proctoring / cheating detection.
+A screening report supplies evidence only; it does not determine hiring outcomes or establish cheating from browser activity.

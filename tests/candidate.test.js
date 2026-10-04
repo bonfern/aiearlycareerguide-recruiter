@@ -20,7 +20,7 @@ const assignment={id:'assignment-1',orgId:'ORG-ONE',jobId:'job-one',name:'A Cand
   durationMinutes:25,integrityEvents:[{type:'tab_hidden',at:at+12000,questionIndex:1},{type:'tab_visible',at:at+16000,questionIndex:1}]};
 
 test('default time scales with question count; only valid custom duration accepted',()=>{
-  assert.deepEqual(DEFAULT_MINUTES,{15:25,25:40,40:60});
+  assert.deepEqual(DEFAULT_MINUTES,{15:25,20:30,25:40,30:45,40:60});
   assert.equal(validDuration(10),true);assert.equal(validDuration(120),true);
   assert.equal(validDuration(9),false);assert.equal(validDuration(121),false);assert.equal(validDuration(20.5),false);
 });

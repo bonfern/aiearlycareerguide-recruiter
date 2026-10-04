@@ -13,6 +13,8 @@ let currentAssessment = null;
 let workingQuestions = [];
 let savedSnapshot = "";
 let generating = false;
+let workingFocus = null;
+let focusApproved = false;
 
 function notify(text, error = false) {
   const box = byId('message'); box.textContent = text; box.classList.toggle('error', error);
@@ -82,7 +84,7 @@ async function openJob(id) {
   clearNotification(); onlyView('job-panel');
   hide('extraction-box'); hide('approved-box'); hide('assessment-box'); hide('candidates-box'); hide('report-box'); show('extract-actions');
   byId('requirements-section').open=false;byId('assessment-box').open=false;byId('candidates-box').open=false;
-  currentAssessment = null; workingQuestions = [];
+  currentAssessment = null; workingQuestions = []; workingFocus = null; focusApproved = false;
   byId('extract-btn').disabled = true;
   try {
     currentJob = (await api(`/api/job?id=${encodeURIComponent(id)}`)).job;
@@ -213,9 +215,70 @@ byId('requirements-form').addEventListener('submit', async event => {
     renderApproved(result.approvedRequirements);
     byId('requirements-section').open=false;byId('assessment-box').open=true;
     await loadAssessment();
-    notify('Requirements approved. Select the assessment length to generate your questions.');
+    notify('Requirements approved. Propose and confirm the most critical assessment competencies.');
   } catch(error) {notify(error.message, true);}
   finally {button.disabled = false;}
+});
+
+// V2 — recruiter-controlled critical competency focus. Existing V1 assessments remain read-only and unchanged.
+function focusDisplay(){
+  if(currentAssessment){hide('assessment-setup');return;}
+  show('assessment-setup');
+  const approved=currentJob?.assessmentFocusApproved;
+  focusApproved=Boolean(approved);
+  workingFocus=workingFocus||approved||currentJob?.assessmentFocusDraft||null;
+  if(workingFocus){
+    byId('question-count').value=String(workingFocus.targetCount);
+    show('focus-panel');drawFocus();
+  }else hide('focus-panel');
+  byId('question-count').disabled=focusApproved;
+  byId('propose-focus-btn').disabled=focusApproved;
+  byId('approve-focus-btn').disabled=focusApproved;
+  if(focusApproved)show('start-assessment-btn');else hide('start-assessment-btn');
+}
+function drawFocus(){
+  const list=byId('focus-list');list.replaceChildren();if(!workingFocus)return;
+  const approved=currentJob?.approvedRequirements;
+  const allowed=approved.requirements.map((r,i)=>({r,i})).filter(({r})=>!['Experience','Qualification'].includes(r.category));
+  workingFocus.groups.forEach((g,i)=>{
+    const card=document.createElement('details');card.className='question-card focus-card';card.open=i===0;
+    const head=el('summary',`Competency ${i+1}: ${g.name} · ${g.questionCount} questions`);head.className='editor-question-title';card.append(head);
+    const inside=el('div',undefined,'editor-question-content');
+    const name=el('label','Competency name');const nameInput=qEl(`Competency ${i+1} name`,g.name,0,95);
+    nameInput.disabled=focusApproved;nameInput.addEventListener('input',()=>{g.name=nameInput.value;head.textContent=`Competency ${i+1}: ${g.name} · ${g.questionCount} questions`;});
+    const rationaleLabel=el('label','Why this matters');const rationale=qEl(`Competency ${i+1} rationale`,g.rationale,2,330);
+    rationale.disabled=focusApproved;rationale.addEventListener('input',()=>g.rationale=rationale.value);
+    const two=el('div',undefined,'two-col');const countBox=el('div'),impBox=el('div');
+    countBox.append(el('label','Questions in this group'));
+    const count=el('input');count.type='number';count.min='3';count.max='12';count.value=String(g.questionCount);count.disabled=focusApproved;
+    count.addEventListener('input',()=>{g.questionCount=Number(count.value);head.textContent=`Competency ${i+1}: ${g.name} · ${g.questionCount} questions`;updateFocusTotal();});countBox.append(count);
+    impBox.append(el('label','Importance'));const imp=selectField(['Critical','High'],g.importance,'Competency importance',v=>g.importance=v);imp.disabled=focusApproved;impBox.append(imp);
+    two.append(countBox,impBox);
+    const reqLabel=el('p','Link the exact JD requirements that this group will assess:','muted');
+    const checklist=el('div',undefined,'focus-requirements');
+    allowed.forEach(({r,i:idx})=>{const label=el('label',undefined,'focus-requirement');const box=el('input');box.type='checkbox';box.checked=g.requirementIndices.includes(idx);box.disabled=focusApproved;
+      box.addEventListener('change',()=>{if(box.checked){if(!g.requirementIndices.includes(idx))g.requirementIndices.push(idx);}else g.requirementIndices=g.requirementIndices.filter(v=>v!==idx);});
+      label.append(box,document.createTextNode(`${r.priority} · ${r.text}`));checklist.append(label);});
+    inside.append(name,nameInput,rationaleLabel,rationale,two,reqLabel,checklist);card.append(inside);list.append(card);
+  });updateFocusTotal();
+}
+function updateFocusTotal(){
+  if(!workingFocus)return;
+  const used=workingFocus.groups.reduce((n,g)=>n+(Number.isFinite(g.questionCount)?g.questionCount:0),0);
+  byId('focus-count-note').textContent=`${used} / ${workingFocus.targetCount} questions allocated across ${workingFocus.groups.length} critical competencies. ${used===workingFocus.targetCount?'Ready to approve.':'Adjust the question counts before approval.'}`;
+}
+byId('question-count').addEventListener('change',()=>{if(workingFocus&&!focusApproved){workingFocus=null;hide('focus-panel');notify('Question count changed. Generate a new competency proposal for this length.');}});
+byId('propose-focus-btn').addEventListener('click',async()=>{
+  if(!currentJob?.approvedRequirements)return;clearNotification();const b=byId('propose-focus-btn');b.disabled=true;b.textContent='Identifying critical competencies…';
+  try{const {plan}=await api('/api/focus',{method:'POST',body:JSON.stringify({jobId:currentJob.id,action:'propose',targetCount:Number(byId('question-count').value)})});
+    currentJob.assessmentFocusDraft=plan;currentJob.assessmentFocusApproved=null;workingFocus=plan;focusApproved=false;focusDisplay();notify('Focus proposed. Review groupings and allocation, then approve.');
+  }catch(e){notify(e.message,true);}finally{b.disabled=false;b.textContent='1. Propose critical competencies with AI';}
+});
+byId('approve-focus-btn').addEventListener('click',async()=>{
+  if(!workingFocus)return;clearNotification();const b=byId('approve-focus-btn');b.disabled=true;
+  try{const {plan}=await api('/api/focus',{method:'POST',body:JSON.stringify({jobId:currentJob.id,action:'approve',plan:workingFocus})});
+    currentJob.assessmentFocusApproved=plan;currentJob.assessmentFocusDraft=plan;workingFocus=plan;focusApproved=true;focusDisplay();notify('Critical competencies approved. You can now create the assessment.');
+  }catch(e){notify(e.message,true);b.disabled=false;}
 });
 
 // Recruiter-only question editor. Never render generated answer keys in a candidate-facing route.
@@ -239,6 +302,7 @@ function drawQuestions() {
   const container=byId('questions-list'); container.replaceChildren();
   if(workingQuestions.length!==currentAssessment.targetCount) return;
   const published=currentAssessment.status==='published';
+  const focus=currentAssessment.focus;
   workingQuestions.forEach((q,i)=>{
     const card=document.createElement('details'); card.className='question-card editor-question';
     card.open=i===0&&!published;
@@ -272,7 +336,7 @@ function drawQuestions() {
   if(!published) show('assessment-actions');
 }
 function assessmentDisplay() {
-  if(!currentAssessment) {show('assessment-setup');hide('assessment-workspace');byId('assessment-status').textContent='Not started';return;}
+  if(!currentAssessment) {show('assessment-setup');hide('assessment-workspace');byId('assessment-status').textContent='Not started';focusDisplay();return;}
   hide('assessment-setup');show('assessment-workspace');
   const a=currentAssessment;
   byId('assessment-status').textContent=a.status;
@@ -350,7 +414,7 @@ async function loadCandidates(){
   const result=await api(`/api/invitations?jobId=${encodeURIComponent(currentJob.id)}`);
   invitations=result.invitations;show('candidates-box');
   byId('candidate-total').textContent=`${invitations.length} candidates`;
-  byId('assessment-duration').value=result.durationMinutes||({15:25,25:40,40:60}[currentAssessment.targetCount]||40);
+  byId('assessment-duration').value=result.durationMinutes||({15:25,20:30,25:40,30:45,40:60}[currentAssessment.targetCount]||40);
   const locked=invitations.length>0;byId('assessment-duration').disabled=locked;byId('save-duration-btn').disabled=locked;
   byId('invite-btn').disabled=!result.canInvite;
   byId('candidate-empty').textContent=invitations.length?'':result.pilotMode?'No invitations yet.':'Invitations disabled until credits are enabled.';
@@ -402,8 +466,64 @@ byId('invite-form').addEventListener('submit',async event=>{
 });
 byId('copy-invite-btn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(byId('invitation-link').value);notify('Link copied.');}catch(error){notify(error.message,true);}});
 byId('report-close-btn').addEventListener('click',()=>hide('report-box'));
-byId('report-print-btn').addEventListener('click',()=>window.print());
+byId('report-print-btn').addEventListener('click',()=>{document.querySelectorAll('#report-content details').forEach(d=>d.open=true);requestAnimationFrame(()=>window.print());});
 function reportLine(parent,label,value){const p=el('p');p.append(el('strong',`${label}: `),document.createTextNode(String(value??'—')));parent.append(p);}
+function renderEvidenceQuestions(parent,r){
+  const appendix=el('details',undefined,'report-appendix');appendix.id='report-appendix';
+  appendix.append(el('summary',`Full question-level evidence · ${r.details.length} questions`));
+  const body=el('div',undefined,'report-appendix-content');
+  r.details.forEach(q=>{
+    const card=el('div',undefined,'question-card report-question report-compact');
+    card.append(el('h4',`Q${q.order}. ${q.question}`));
+    const line=el('p',`${q.competency} · ${q.type} · ${q.timeSeconds}s estimated active time · ${q.changes} answer changes`,'muted');card.append(line);
+    const options=el('ol');options.type='A';q.options.forEach((text,index)=>{
+      const li=el('li',text);if(index===q.correctIndex)li.classList.add('correct-option');
+      if(index===q.selectedIndex)li.classList.add('chosen-option');options.append(li);});card.append(options);
+    reportLine(card,'Candidate selected',q.selectedIndex===null?'Not answered':`Option ${'ABCD'[q.selectedIndex]} — ${q.options[q.selectedIndex]}`);
+    reportLine(card,'Correct / preferred',`Option ${'ABCD'[q.correctIndex]} — ${q.options[q.correctIndex]}`);
+    reportLine(card,'Evaluation',q.isCorrect===null?'Not attempted':q.isCorrect?'Correct':'Incorrect');
+    reportLine(card,'Reason',q.rationale);body.append(card);
+  });appendix.append(body);parent.append(appendix);
+}
+function renderV2Report(parent,r){
+  const profile=r.profile||{},summary=el('section',undefined,'report-executive');
+  summary.append(el('h3','Candidate assessment profile'),el('p',profile.summary||'No profile generated.'));
+  summary.append(el('p',profile.eligibilityNote||'Screening questions cannot verify work experience.','muted'));
+  if(profile.source)summary.append(el('p',`Narrative: ${profile.source}`,'muted fine'));
+  const highlights=el('div',undefined,'report-highlights');
+  for(const [heading,items] of [['Demonstrated strengths',profile.strengths],['Areas for further validation',profile.gaps]]){
+    const section=el('section',undefined,'report-highlight');section.append(el('h4',heading));
+    const list=el('ul');(items?.length?items:['No distinct areas identified from this assessment.']).forEach(x=>list.append(el('li',x)));
+    section.append(list);highlights.append(section);
+  }summary.append(highlights);parent.append(summary);
+  const competencies=el('section',undefined,'report-executive');competencies.append(el('h3','Critical competency profile'));
+  competencies.append(el('p','These scores describe performance on sampled questions, not verified real-world proficiency. Competencies were selected and approved before the assessment.','muted'));
+  r.competencies.forEach(c=>{
+    const row=el('div',undefined,'report-competency');
+    const title=el('div',undefined,'report-competency-header');title.append(el('strong',c.name),el('span',`${c.correct}/${c.total} · ${c.score??'—'}%`));row.append(title);
+    const track=el('div',undefined,'report-progress');const fill=el('div',undefined,'report-progress-fill');fill.style.width=`${c.score||0}%`;track.append(fill);row.append(track);
+    row.append(el('p',`${c.finding} · ${c.evidenceDepth}. ${c.importance} priority.`,'muted'));competencies.append(row);
+  });parent.append(competencies);
+  const validation=el('section',undefined,'report-executive');validation.append(el('h3','Suggested interview validation'));
+  if(profile.interviewValidation?.length){const list=el('ol');profile.interviewValidation.forEach(v=>{
+    const li=el('li');li.append(el('strong',`${v.competency}: `),document.createTextNode(v.focus));list.append(li);});validation.append(list);
+  }else validation.append(el('p','No specific weakness-triggered questions identified. Recruiter may still validate actual experience.'));
+  if(profile.eligibilityChecks?.length){validation.append(el('h4','Eligibility requirements to verify independently'));
+    const list=el('ul');profile.eligibilityChecks.forEach(v=>list.append(el('li',v)));validation.append(list);}
+  if(profile.notTestedMustHaves?.length){validation.append(el('h4','Important JD requirements not tested'));
+    const list=el('ul');profile.notTestedMustHaves.forEach(v=>list.append(el('li',v)));validation.append(list);}
+  parent.append(validation);
+  const timing=el('section',undefined,'report-executive');timing.append(el('h3','Timing and browser activity'));
+  reportLine(timing,'Average elapsed time per question',`${Math.round(r.elapsedSeconds/r.total)}s`);
+  reportLine(timing,'Tab-hidden events',r.integrity.tabSwitches);
+  reportLine(timing,'Window-blur events',r.integrity.windowBlurEvents);
+  timing.append(el('p',r.integrity.timingNote,'muted'));
+  const events=el('details');events.append(el('summary','View full browser event timeline'));
+  const eventsList=el('ul');(r.integrity.events||[]).forEach(e=>eventsList.append(el('li',`${new Date(e.at).toLocaleString('en-IN')}: ${e.type.replaceAll('_',' ')} (question ${e.questionIndex+1})`)));
+  events.append(eventsList);timing.append(events);parent.append(timing);
+  renderEvidenceQuestions(parent,r);
+  const caveats=el('div',undefined,'callout');r.limitations.forEach(x=>caveats.append(el('p',x)));parent.append(caveats);
+}
 async function openReport(id){
   hide('report-box');clearNotification();
   try{
@@ -416,7 +536,9 @@ async function openReport(id){
       ['Time',`${Math.floor(r.elapsedSeconds/60)}m ${r.elapsedSeconds%60}s`],['Outcome',r.finishReason.replaceAll('_',' ')]]){
       const box=el('div',undefined,'report-metric');box.append(el('span',label),el('strong',value));summary.append(box);}
     intro.append(summary);reportLine(intro,'Assessment version',r.assessmentVersion);reportLine(intro,'Candidate email',r.candidateEmail);
-    content.append(intro,el('h3','Competency evidence'));
+    content.append(intro);
+    if(r.reportVersion===2){renderV2Report(content,r);}else{
+    content.append(el('h3','Legacy competency evidence'));
     const table=el('table');const head=el('tr');['JD requirement','Correct / asked','Rating'].forEach(x=>head.append(el('th',x)));table.append(head);
     r.competencies.forEach(c=>{const row=el('tr');row.append(el('td',c.requirement),el('td',`${c.correct}/${c.total}`),el('td',c.level));table.append(row);});content.append(table);
     content.append(el('h3','Question-level evidence'));
@@ -441,7 +563,9 @@ async function openReport(id){
     const list=el('ul');(r.integrity.events||[]).forEach(e=>list.append(el('li',`${new Date(e.at).toLocaleString('en-IN')}: ${e.type.replaceAll('_',' ')} (question ${e.questionIndex+1})`)));
     events.append(list);info.append(events);content.append(info);
     const caveats=el('div',undefined,'callout');r.limitations.forEach(x=>caveats.append(el('p',x)));
-    content.append(caveats);show('report-box');
+    content.append(caveats);
+    }
+    show('report-box');
     // Opening a report is explicit navigation; unlike ordinary actions, reveal its header.
     byId('report-box').scrollIntoView({behavior:'smooth',block:'start'});
   }catch(error){notify(error.message,true);}

@@ -1,5 +1,6 @@
 import {requireRecruiter,reject} from './_auth.js';
 import {finalizeAttempt} from './_candidate.js';
+import {polishProfile} from './_profile.js';
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
@@ -10,8 +11,21 @@ export default async function handler(req,res){
     const ref=user.db.collection('recruiter_invitations').doc(id),invite=await ref.get();
     if(!invite.exists||invite.data().orgId!==user.orgId)return res.status(404).json({error:'Candidate not found'});
     if(invite.data().status==='started'&&Date.now()>=invite.data().deadlineAt)await finalizeAttempt(user.db,ref,'timeout');
-    const doc=await user.db.collection('recruiter_reports').doc(id).get();
+    const reportRef=user.db.collection('recruiter_reports').doc(id);
+    const doc=await reportRef.get();
     if(!doc.exists||doc.data().orgId!==user.orgId)return res.status(404).json({error:'The candidate has not completed this assessment yet'});
-    return res.status(200).json({report:doc.data()});
+    let report=doc.data();
+    if(report.reportVersion===2 && report.profile?.source==='Rule-based interpretation of actual responses' && process.env.OPENAI_API_KEY){
+      const updated=await polishProfile(report);
+      if(updated){
+        // Avoid repeated narrative generation on subsequent report views. Hard scores remain untouched.
+        try{await user.db.runTransaction(async tx=>{const latest=await tx.get(reportRef);
+          if(latest.exists && latest.data().orgId===user.orgId && latest.data().profile?.source==='Rule-based interpretation of actual responses')
+            tx.update(reportRef,{profile:updated});
+        });report={...report,profile:updated};}
+        catch(e){console.error('Profile cache update failed:',e.message); /* Still serve the original report. */}
+      }
+    }
+    return res.status(200).json({report});
   }catch(error){console.error('report API error',error.message);return res.status(500).json({error:'Unable to open the assessment report'});}
 }

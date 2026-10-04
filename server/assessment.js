@@ -1,6 +1,7 @@
 import {requireRecruiter, reject} from './_auth.js';
 import {assessmentSignature, cleanQuestions, SIZES, QUESTION_VERSION} from '../lib/assessment.js';
 import {durationFor,validDuration} from '../lib/candidate.js';
+import {FOCUS_VERSION,focusSignature,validateQuestionCoverage,V2_SIZES} from '../lib/focus.js';
 
 const validId = id => typeof id === 'string' && /^[a-zA-Z0-9]{10,40}$/.test(id);
 const view = snap => snap.exists ? {id: snap.id, ...snap.data(), generationLock: undefined,
@@ -27,21 +28,27 @@ export default async function handler(req, res) {
     const action = req.body?.action;
     if (action === 'start') {
       const targetCount = Number(req.body.targetCount);
-      if (!SIZES.includes(targetCount)) return res.status(400).json({error:'Choose 15, 25 or 40 questions'});
+      if (!V2_SIZES[targetCount]) return res.status(400).json({error:'Choose 20, 30 or 40 questions'});
       const result = await user.db.runTransaction(async tx => {
         const [latestJob, current] = await Promise.all([tx.get(jobRef), tx.get(ref)]);
         if (!latestJob.exists || latestJob.data().orgId !== user.orgId) throw Object.assign(new Error('Job not found'),{status:404});
         if (!latestJob.data().approvedRequirements) throw Object.assign(new Error('Requirements must be approved first'),{status:409});
+        const focus=latestJob.data().assessmentFocusApproved;
+        if (!focus || focus.version!==FOCUS_VERSION || focus.targetCount!==targetCount) throw Object.assign(new Error('Approve the critical competency focus for this assessment length first'),{status:409});
         if (current.exists) return view(current); // Explicitly prevent overwriting previously generated/published questions.
         const value = {orgId:user.orgId, jobId, targetCount, status:'draft', version:1, questions:[], cacheInitialized:false,
-          generatedCount:0, reusedCount:0, questionVersion:QUESTION_VERSION, createdAt:new Date(), updatedAt:new Date()};
+          generatedCount:0, reusedCount:0, questionVersion:FOCUS_VERSION,focus:latestJob.data().assessmentFocusApproved, durationMinutes:V2_SIZES[targetCount].minutes,createdAt:new Date(), updatedAt:new Date()};
         tx.create(ref,value); tx.update(jobRef,{status:'assessment_draft',updatedAt:new Date()});
         return {...value, id:jobId};
       });
       return res.status(200).json({assessment:result});
     }
     if (action === 'save') {
-      const questions = cleanQuestions(req.body.questions, jobSnap.data().approvedRequirements);
+      const asmtForValidation=await ref.get();
+      if(!asmtForValidation.exists)return res.status(404).json({error:'Assessment not found'});
+      const focus=asmtForValidation.data().questionVersion===FOCUS_VERSION?asmtForValidation.data().focus:null;
+      let questions;try{questions=cleanQuestions(req.body.questions,jobSnap.data().approvedRequirements,{focus});
+        if(focus)validateQuestionCoverage(questions,focus);}catch(error){return res.status(400).json({error:error.message});}
       const result = await user.db.runTransaction(async tx => {
         const [job, snap] = await Promise.all([tx.get(jobRef), tx.get(ref)]);
         if (!job.exists || job.data().orgId !== user.orgId || !snap.exists || snap.data().orgId !== user.orgId)
@@ -72,16 +79,19 @@ export default async function handler(req, res) {
         if (!job.exists || job.data().orgId !== user.orgId || !assessment.exists || assessment.data().orgId !== user.orgId) throw Object.assign(new Error('Job or assessment not found'),{status:404});
         const data = assessment.data();
         if (data.status !== 'draft' || data.generationLock?.until > Date.now()) throw Object.assign(new Error('Assessment cannot be published right now'),{status:409});
-        const questions = cleanQuestions(data.questions,job.data().approvedRequirements);
+        const focus=data.questionVersion===FOCUS_VERSION?data.focus:null;
+        const questions = cleanQuestions(data.questions,job.data().approvedRequirements,{focus});
+        if(focus)validateQuestionCoverage(questions,focus);
         if (questions.length !== data.targetCount) throw Object.assign(new Error('Generate all questions before publishing'),{status:409});
-        const signature = assessmentSignature(user.orgId,job.data().approvedRequirements);
+        const signature = focus?focusSignature(user.orgId,job.data().approvedRequirements,focus):assessmentSignature(user.orgId,job.data().approvedRequirements);
         const cache = user.db.collection('published_question_templates').doc();
         const approved = job.data().approvedRequirements;
         const durationMinutes=durationFor(data);
         tx.update(ref,{status:'published',durationMinutes,publishedAt:new Date(),updatedAt:new Date()});
         tx.update(jobRef,{status:'published',updatedAt:new Date()});
         tx.create(cache,{orgId:user.orgId,sourceJobId:jobId,signature,roleTitle:approved.roleTitle,seniority:approved.seniority,
-          requirements:approved.requirements,questions,questionVersion:QUESTION_VERSION,createdAt:new Date()});
+          requirements:approved.requirements,questions,questionVersion:data.questionVersion||QUESTION_VERSION,
+          ...(focus?{focus}:{}),createdAt:new Date()});
         return {ok:true, status:'published'};
       });
       return res.status(200).json(result);

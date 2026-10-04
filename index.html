@@ -96,10 +96,14 @@
         <div class="workspace-content">
 
         <div id="assessment-setup">
-          <p class="muted">Generate a recruiter-reviewed question bank for this JD. Similar approved roles may reduce AI generation costs.</p>
+          <p class="muted">V2 tests only the most critical job-related competencies. Propose the focus, edit the groups and question allocation, then approve before creating the assessment. Existing published assessments remain unchanged.</p>
           <label for="question-count">Assessment length</label>
-          <select id="question-count"><option value="15">Short — 15 questions</option><option value="25" selected>Standard — 25 questions</option><option value="40">Detailed — 40 questions</option></select>
-          <div class="actions"><button type="button" id="start-assessment-btn">Create assessment draft</button></div>
+          <select id="question-count"><option value="20" selected>Short — 20 questions · 30 minutes · 4 competencies</option><option value="30">Standard — 30 questions · 45 minutes · 5 competencies</option><option value="40">Detailed — 40 questions · 60 minutes · 6 competencies</option></select>
+          <div class="actions"><button type="button" id="propose-focus-btn">1. Propose critical competencies with AI</button></div>
+          <div id="focus-panel" class="hidden"><p class="callout">Review competency names, linked JD requirements and question counts. Focus on what matters most for this role. Experience and qualifications remain eligibility checks, not MCQ scores.</p>
+            <div id="focus-list"></div><p id="focus-count-note" class="muted"></p>
+            <div class="actions"><button type="button" id="approve-focus-btn">2. Approve assessment focus</button></div></div>
+          <div class="actions"><button type="button" id="start-assessment-btn" class="hidden">3. Create assessment draft</button></div>
         </div>
         <div id="assessment-workspace" class="hidden">
           <div id="generation-info" class="callout"></div>
@@ -119,7 +123,7 @@
         <div class="duration-control"><label for="assessment-duration">Overall assessment duration (minutes)</label>
           <div class="actions"><input id="assessment-duration" type="number" min="10" max="120" step="1" value="40" />
           <button class="secondary" type="button" id="save-duration-btn">Save duration</button></div>
-          <p class="muted fine">Default: 15 questions = 25 minutes; 25 = 40 minutes; 40 = 60 minutes. This becomes fixed after the first invitation.</p></div>
+          <p class="muted fine">V2 defaults: 20 questions = 30 minutes; 30 = 45 minutes; 40 = 60 minutes. Older published assessments retain their original duration. This becomes fixed after the first invitation.</p></div>
         <form id="invite-form" class="candidate-invite-form">
           <div class="two-col"><div><label for="candidate-name">Candidate name</label><input id="candidate-name" required minlength="2" maxlength="120" autocomplete="off" placeholder="Candidate's full name" /></div>
             <div><label for="candidate-email">Candidate email</label><input id="candidate-email" required type="email" autocomplete="off" placeholder="candidate@example.com" /></div></div>
