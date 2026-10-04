@@ -1,14 +1,14 @@
-# Persistent role-template caching (designed now; implemented in Steps 2–3)
+# Cache strategy — Recruiter (Step 2)
 
-Keep two different caches:
+**Implemented now**
+1. Organization-scoped *exact-JD extraction cache*. A SHA256 key contains the organization ID, extraction prompt/schema version, normalized job title, and JD text hash. The full extracted result is saved in Firestore and reused on an exact hit, avoiding an OpenAI call.
+2. Organization-scoped *approved role suggestions*. After extracting a JD, compare it to up to 100 previously approved organization templates using conservative token overlap. Require compatible role title, identical seniority and complete matching of the approved template's Must Have requirements; suggest only. Never silently replace the new JD's extraction with a template.
+3. Stable system instructions precede role-specific JD content for API-side prompt caching when available.
 
-1. **Exact JD extraction cache**: SHA-256 hash of normalized text, scoped to the recruiter organization. An identical JD can reuse the prior AI extraction. Editing a JD changes its hash and invalidates the exact hit.
-2. **Approved role-template cache**: store the organization, canonical role, seniority, extracted skill/requirement list, embedding, validated requirements, approved question templates, template version, AI prompt version and model version. Suggest candidates when semantic similarity is sufficiently high **and** mandatory requirements and seniority agree; no similarity threshold should override a must-have mismatch.
+**Next phase (assessment generation)**
+- Cache approved question templates alongside requirements for similar roles. Reuse safe, suitable questions after recruiter review; generate only missing/changed requirements. Save template version, model, prompt version and requirement linkage. Published versions remain immutable.
+- Optionally add embedding-based semantic search when organization template count merits the added complexity and spend; only after hard Must Have and seniority checks.
 
-When a recruiter uploads a JD, check exact hash first. If there is no hit, perform extraction and check role-template similarity. Provide the closest safe template to the recruiter for review, show differences, generate only missing questions, then publish a new assessment version. Do not blindly reuse a generic assessment merely because job titles match.
+**No candidate personal data** in any cache. Do not share one organization’s JD, templates or embeddings with another organization. Extracted JD text can contain confidential employer material: encrypt/lock down Admin access, limit retention, and show privacy terms before onboarding external recruiters.
 
-**Isolation**: never share an organization's proprietary JDs, approved templates or embeddings with another organization by default. Candidate names, responses, scores, reports, invitation tokens, coupon details and invoices are *never* part of reusable role caches.
-
-**Cost tracking**: store cache-hit type (exact/similar/miss), skipped calls, embedding cost, model usage tokens, input cached tokens and AI generation cost by organization. OpenAI prompt caching is a separate, short-lived API optimization: keep shared instructions first and JD-specific information last. This does not replace your persistent Firestore role cache.
-
-**Question integrity**: approved templates may need rotating equivalent questions and answer-option ordering to reduce sharing between candidates. Maintain consistent difficulty and validated requirement coverage across variants. Published assessments are immutable; editing creates a new version. Candidate reports must still be computed from that individual's answers.
+**Billing**: This phase does not debit candidate assessment credits (payment and candidate invitations are not implemented yet). Separate rate/budget limits at OpenAI project level provide cost protection during testing.

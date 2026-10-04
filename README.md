@@ -1,41 +1,34 @@
-# AI Early Career Guide — Recruiter Assessment (Step 1)
+# AI Early Career Guide — Recruiter Assessment | Step 2
 
-**Independent project**: a separate GitHub repository, Vercel project, Firebase project and future AI/payment integrations from the existing Student and Professional assessments. Suggested domain: `recruiter.aiearlycareerguide.com`.
+Independent recruiter application. Keep the existing Student and Professional apps untouched. Step 2 adds authenticated JD upload/paste, OpenAI requirement extraction, organisation-scoped exact-JD caching, organisation-scoped suggestions of similar *previously recruiter-approved* roles, recruiter editing and approval.
 
-This first build supports recruiter login, a multi-JD dashboard, and creating draft JDs by pasting the text. AI extraction, PDF/DOCX uploads, credits, coupons, candidates and reports are intentionally **not built yet**. See `docs/BUILD-PLAN.md` and `docs/CACHE-STRATEGY.md`.
+**Not yet implemented:** choice-based question generation, full approved-question reuse, candidate invitations, OTP, evidence reports, and paid credits/coupons. These follow in later phases. Similar-role suggestions here are *not* automatic extraction reuse; they become inputs to controlled question-template reuse during assessment generation.
 
-## 1. Create a NEW Firebase project
-1. Open https://console.firebase.google.com and select **Add project**. Give it a distinct name such as `ai-guide-recruiter`.
-2. Under **Build → Authentication → Sign-in method**, enable **Email/Password**.
-3. Under **Authentication → Users**, add your own email and a strong temporary password. Only create trusted users there; the website has no public signup.
-4. Under **Build → Firestore Database**, create a database. Choose a region suitable for your users and select production mode.
-5. Publish the provided `firestore.rules` under **Firestore → Rules**. All browser access is denied; Vercel APIs use Firebase Admin and validate each request.
-6. Under **Project settings → General → Your apps**, add a Web App. Copy its public config values.
-7. Under **Project settings → Service accounts**, generate a **NEW** Admin SDK service-account key for this Firebase project. Keep it private; never upload it to GitHub.
+## Deploy this update without installing Node.js
 
-## 2. Create your new GitHub repository
-1. Create a new **private** repository called `aiearlycareerguide-recruiter`.
-2. Unzip this starter folder on your computer. Upload its **contents** to the new repository (not into the existing student/professional repo).
-3. Confirm `.env.local` and service-account JSON files are not committed. `.gitignore` already excludes `.env.*` except `.env.example`.
+1. Download and unzip `recruiter-assessment-step2.zip`. In your **recruiter-only GitHub repository**, replace existing files with the new full versions and add the new files. Keep the directory structure (e.g., `api/extract.js` remains under `api/`). Do not change the Student/Professional repository.
+2. Create an OpenAI **API key** in a separately configured API project at https://platform.openai.com/api-keys. Set a modest project spend limit and usage alerts. An existing ChatGPT subscription does not include API credits.
+3. In your **Recruiter Vercel project only**, go to **Settings → Environment Variables**. Add `OPENAI_API_KEY` (secret) with the new key. Optionally set `OPENAI_EXTRACTION_MODEL` to `gpt-4.1-mini` (default). Never enter an OpenAI key in website code or GitHub.
+4. Redeploy the recruiter project (ensure Vercel is building the new GitHub commit). The new `package.json` installs `mammoth` and `pdf-parse` in Vercel automatically; you don't need Node.js locally.
+5. Log in at https://recruiter.aiearlycareerguide.com. Open the previously created draft job, select **Extract requirements with AI**, edit a requirement or priority, and click **Approve requirements**. For upload testing, create another job using a machine-readable PDF/DOCX or TXT file up to 2 MB.
+6. For cache testing, create a new job with the **same title and identical JD text**, then extract. The screen should say **Cache hit** and no second OpenAI call is needed. A similar but not identical approved JD may show a suggested template; it will not blindly reuse it.
 
-## 3. Configure and seed the first recruiter locally
-1. Install Node.js 20+ and Git if not already installed. Download your new private GitHub project onto your computer, open a terminal in its folder and run `npm install`.
-2. Copy `.env.example` to `.env.local`. Fill in credentials from the **new** Firebase project, public Web App fields, `OWNER_EMAIL` matching the Auth user you created and `ORGANIZATION_NAME`.
-3. For `FIREBASE_PRIVATE_KEY`, use the service-account `private_key` value with `\\n` inside the quoted environment string. Do not paste the JSON file itself into GitHub.
-4. Run `npm run seed:owner` **once**. This creates your organization and grants your Auth user owner access. The script is idempotent if run twice.
-5. Run `npm test`. All cache-key tests should pass. `npm run dev` starts the application locally if you have authenticated the Vercel CLI and linked the project.
+## Data collections
 
-## 4. Create a NEW Vercel deployment
-1. Import the new GitHub repository at https://vercel.com/new as a **new project**; leave Framework Preset at **Other**. Do not attach the existing two assessment deployments to this project.
-2. Add all Firebase variables from `.env.example` in **Project → Settings → Environment Variables** (except `OWNER_EMAIL`/`ORGANIZATION_NAME`, used only by the local seed script). Never set `FIREBASE_PRIVATE_KEY` as a public variable.
-3. Deploy. Open the provided `.vercel.app` preview and confirm you see the recruiter login.
-4. In the **new project**'s **Settings → Domains**, add `recruiter.aiearlycareerguide.com`, then follow Vercel's DNS instructions. Keep the root domain configured for the existing website.
-5. In **Firebase Authentication → Settings → Authorized domains**, add the Vercel preview/deployment domain and new recruiter subdomain. Some configurations need a matching `authDomain`; keep it set to your new Firebase project domain unless you have configured custom Firebase Auth hosting.
-6. Sign in and test: **Create job → paste at least 50 characters of JD → Save draft → see the new job on the dashboard → sign out**.
+- `recruiter_jobs`: JD, extraction, approval, and status for each role. Existing draft jobs remain compatible.
+- `jd_extraction_cache`: SHA256 of org ID + prompt version + JD fingerprint. Exact hits skip extraction API costs. Does not store candidate data.
+- `approved_role_templates`: reviewer-approved requirements stored per organization for future question-template reuse. For safety, comparison requires compatible seniority, role title and Must Have requirements.
 
-## Security / boundaries
-- Do not reuse the existing Student/Professional Firebase project, authentication records or service-account credentials.
-- Backend verifies Firebase ID tokens and checks the `recruiter_members/{uid}` organization membership before accessing any recruiter data.
-- The API gets `orgId` from verified membership, never from the browser's request body.
-- Do not add AI or payment keys until the respective phases.
-- Initial organization onboarding is administrative, not self-service. Owner invitations and multi-company onboarding will be implemented when required.
+All API endpoints require a Firebase ID token and membership in the organization. Direct client access to Firestore remains denied by `firestore.rules`. A recruiter cannot pass another organization's ID in the request to access its data.
+
+## Typical problems
+
+- **OpenAI configuration missing**: Confirm `OPENAI_API_KEY` exists under the *recruiter* Vercel project and redeploy.
+- **Unauthorized**: Verify the recruiter Firebase login and your existing `recruiter_members` record.
+- **Scanned PDF**: Image-only PDFs aren't supported in this phase; paste the JD text or use a readable DOCX/PDF.
+- **File parsing error**: Keep uploads under 2 MB, and ensure that `package.json` has been replaced and deployed.
+- **Status already approved**: Approved requirements are locked for this phase. To assess a materially revised JD, create a new job; versioning follows in assessment-generation phase.
+
+## Internal checks
+
+`npm test` (executed by GitHub Actions if desired) verifies JD hashing, organization-scoped keys, extraction validation and guarded similarity suggestions. Never commit `.env.local` or service-account JSON to GitHub.
