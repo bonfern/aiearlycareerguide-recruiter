@@ -19,8 +19,15 @@ export function inviteUrl(token){const base=process.env.RECRUITER_BASE_URL||'htt
   return `${base}/candidate.html?invite=${encodeURIComponent(token)}`;}
 export async function sendEmail(to,subject,html){const sender=process.env.RECRUITER_FROM_EMAIL;
   if(!process.env.RESEND_API_KEY || !sender) throw new Error('RESEND_API_KEY and RECRUITER_FROM_EMAIL are required');
+  const base=process.env.RECRUITER_BASE_URL||'https://recruiter.aiearlycareerguide.com';
+  const brandLogo=/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(base)?`${base}/assets/brand-logo.png`:'https://recruiter.aiearlycareerguide.com/assets/brand-logo.png';
+  const brandedHtml=`<div style="max-width:600px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#102448;line-height:1.65">
+    <div style="border-bottom:1px solid #dfe8ed;padding:12px 0 18px"><img src="${brandLogo}" width="218" alt="AI Early Career Guide" style="display:block;width:218px;max-width:100%;height:auto"/>
+    <p style="font-size:13px;color:#167c83;margin:7px 0 0;font-weight:700">Recruiter Assessments</p></div>
+    <div style="padding:15px 0">${html}</div>
+    <div style="border-top:1px solid #dfe8ed;margin-top:15px;padding:14px 0;color:#627489;font-size:12px">AI Early Career Guide · Explore Today. Brighter Tomorrows.</div></div>`;
   const result=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${process.env.RESEND_API_KEY}`,'Content-Type':'application/json'},
-    body:JSON.stringify({from:sender,to:[to],subject,html})});
+    body:JSON.stringify({from:sender,to:[to],subject,html:brandedHtml})});
   if(!result.ok){console.error('Resend delivery returned status',result.status);throw new Error('Email delivery failed. Verify the sender domain and Resend configuration.');}
   return result.json();}
 export const safeHtml = value => String(value).replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));

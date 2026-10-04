@@ -80,3 +80,96 @@ select:focus{outline:3px solid #dce9ff;border-color:#3774d7}
 #report-box summary{cursor:pointer;color:#1957bb}
 @media(max-width:700px){.candidate-top{flex-direction:column}.timer-card{align-self:stretch}.candidate-actions>*{flex:1}.report-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.candidate-option{font-size:14px}.compact-actions{flex-direction:column}}
 @media print{.site-header,#logout,#message,#report-close-btn,#report-print-btn,footer,.page-top,#assessment-box,#approved-box,#extract-actions,#extraction-box,#candidates-box,.jd-preview,#detail-back-btn{display:none!important}main{max-width:100%;margin:0;padding:0}.card{border:0;box-shadow:none;padding:0}#job-panel,#report-box{display:block!important}#report-box .question-card{break-inside:avoid;background:white}#report-box .callout{break-inside:avoid}body{background:white}}
+
+/* STEP 4 UI polish: faithful official branding and stable, compact layouts */
+:root{--brand-navy:#071d45;--brand-teal:#008d97;--brand-mint:#e8f7f6}
+.site-header{gap:24px;padding-top:11px;padding-bottom:11px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0;letter-spacing:normal}
+.brand-link{text-decoration:none;color:inherit}
+.brand-logo{width:192px;max-width:100%;height:auto;object-fit:contain;display:block}
+.brand-product{font-size:14px;font-weight:700;color:var(--brand-navy);padding-left:13px;border-left:1px solid #dce5eb;white-space:normal}
+.site-header .tag{white-space:nowrap}
+button:not(.secondary):not(.question-nav-item){background:var(--brand-navy);border-color:var(--brand-navy)}
+button:not(.secondary):not(.question-nav-item):hover:not(:disabled){background:#123467;border-color:#123467}
+.brand-logo+small{display:block}
+.eyebrow{color:#087d87}
+/* Notifications do not steal scroll or jump the viewport */
+#message,#candidate-message{position:fixed;right:20px;bottom:20px;z-index:1000;max-width:min(480px,calc(100% - 40px));margin:0;box-shadow:0 12px 35px rgba(15,33,61,.17)}
+/* Native details preserve open state through asynchronous updates. */
+.workspace-section{display:block;border:1px solid #dfe7ee;border-radius:12px;margin:20px 0;background:#fff;overflow:hidden}
+.workspace-section.assessment-section{padding:0;border-top:1px solid #dfe7ee}
+.workspace-summary{display:flex;align-items:center;justify-content:space-between;gap:14px;cursor:pointer;list-style:none;min-height:64px;padding:17px 19px;background:#f7fafc;color:var(--brand-navy)}
+.workspace-summary::-webkit-details-marker{display:none}
+.workspace-summary>span:first-child{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.workspace-summary strong{font-size:17px;line-height:1.3}
+.workspace-summary small{font-size:10px;color:#187780;font-weight:800;letter-spacing:.11em;text-transform:uppercase}
+.workspace-summary .disclosure-icon{display:inline-block;color:#587086;font-size:21px;transition:transform .17s ease}
+[open]>.workspace-summary .disclosure-icon{transform:rotate(180deg)}
+.workspace-summary:hover{background:#edf5f7}
+.workspace-summary:focus-visible{outline:3px solid #65b6c1;outline-offset:-3px}
+.workspace-content{padding:19px}
+.workspace-content>.muted:first-child{margin-top:0}
+#job-panel>.section-head{margin-bottom:27px}
+#job-panel>.section-head .muted{margin:4px 0 0}
+.dashboard-jobs{padding:0;overflow:hidden}
+.dashboard-jobs-content{padding:22px}
+.dashboard-jobs .section-head{align-items:center}
+.dashboard-jobs .section-head label{margin:0}
+/* Each editor card collapses independently, avoiding enormous 40-question pages. */
+.editor-question{padding:0;overflow:hidden}
+.editor-question-title{padding:15px 18px;cursor:pointer;list-style:none;font-weight:750;line-height:1.55;color:var(--brand-navy);background:#f6f9fb}
+.editor-question-title::-webkit-details-marker{display:none}
+.editor-question-title:before{content:'▸';margin-right:9px;color:var(--brand-teal)}
+.editor-question[open]>.editor-question-title:before{content:'▾'}
+.editor-question-content{padding:16px 19px 23px;border-top:1px solid #e5eaf1}
+.editor-question[open]{border-color:#b2d6d9}
+/* Candidate test never stretches across the viewport in focus view. */
+.candidate-main{max-width:980px;margin:28px auto 70px}
+.candidate-main #candidate-test{max-width:960px;width:100%;margin-inline:auto}
+.candidate-top{align-items:center}
+.candidate-top h1{font-size:clamp(23px,3vw,30px);line-height:1.3}
+.test-tools{display:flex;align-items:center;gap:12px}
+#focus-toggle{font-size:12px;white-space:nowrap}
+.focus-mode .candidate-main{max-width:830px}
+.focus-mode #candidate-test{max-width:810px}
+.focus-mode .candidate-option{padding:13px 15px}
+.focus-mode .question-nav{max-height:94px;overflow-y:auto}
+.candidate-actions{gap:12px}
+.candidate-actions button{min-width:120px}
+.candidate-actions #candidate-submit{margin-left:auto}
+.candidate-actions .hidden{display:none!important}
+#candidate-question{scroll-margin-top:24px}
+#candidate-question-text{max-width:76ch;font-size:clamp(16px,2vw,18px)}
+.candidate-option{font-size:15px;line-height:1.52}
+.report-brand{display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-bottom:1px solid #e5eaf1;margin-bottom:18px;padding-bottom:12px}
+.report-brand img{width:185px;max-width:60%;height:auto}
+.report-brand span{font-size:12px;color:#53677d}
+@media(max-width:700px){
+  .site-header{padding:10px 12px;gap:10px}
+  .brand-logo{width:134px}
+  .brand-product{font-size:11px;padding-left:8px}
+  .site-header .tag{font-size:10px}
+  .workspace-summary{padding:13px 14px}
+  .workspace-summary strong{font-size:15px}
+  .workspace-content,.dashboard-jobs-content{padding:14px}
+  .candidate-main{margin:16px auto 50px}
+  .candidate-main #candidate-test{padding:16px}
+  .candidate-top{align-items:stretch}
+  .test-tools{width:100%;justify-content:space-between}
+  .timer-card{min-width:125px;padding:8px 12px}
+  .timer-card strong{font-size:23px}
+  .candidate-actions{flex-direction:row;flex-wrap:wrap}
+  .candidate-actions button{flex:1;min-width:0}
+  .candidate-actions #candidate-submit{flex:1 1 100%;margin-left:0}
+  .question-nav-item{width:36px;height:36px}
+  #message,#candidate-message{right:12px;bottom:12px;max-width:calc(100% - 24px)}
+}
+@media print{
+  .report-brand{display:flex!important;margin:0 0 15px;padding-bottom:12px}
+  .report-brand img{width:180px}
+  #message,#candidate-message{display:none!important}
+  #report-box{padding-top:0}
+}
+
+.question-nav-item{background:#fff!important;color:#375472!important;border-color:#bccce2!important}.question-nav-item.answered{background:#e0f5ec!important;color:#166148!important;border-color:#a8d8c4!important}.question-nav-item.current{background:#eef6fa!important;color:#083d59!important;border-color:#4e9db0!important;outline:2px solid #8ac9d2}
+.candidate-option:has(input:disabled){opacity:.83;cursor:progress}

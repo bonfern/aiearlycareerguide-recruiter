@@ -16,7 +16,8 @@ let generating = false;
 
 function notify(text, error = false) {
   const box = byId('message'); box.textContent = text; box.classList.toggle('error', error);
-  show('message'); box.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  // Non-scrolling toast: notifications must not drag users away from their work.
+  show('message');
 }
 function clearNotification() { hide('message'); }
 function onlyView(view) {
@@ -80,6 +81,7 @@ function renderApproved(approved) {
 async function openJob(id) {
   clearNotification(); onlyView('job-panel');
   hide('extraction-box'); hide('approved-box'); hide('assessment-box'); hide('candidates-box'); hide('report-box'); show('extract-actions');
+  byId('requirements-section').open=false;byId('assessment-box').open=false;byId('candidates-box').open=false;
   currentAssessment = null; workingQuestions = [];
   byId('extract-btn').disabled = true;
   try {
@@ -87,9 +89,9 @@ async function openJob(id) {
     byId('detail-title').textContent = currentJob.title;
     byId('detail-status').textContent = `Status: ${currentJob.status.replaceAll('_',' ')}`;
     byId('detail-jd').textContent = currentJob.jdText;
-    if (currentJob.approvedRequirements) { renderApproved(currentJob.approvedRequirements); await loadAssessment(); }
-    else if (currentJob.extraction) {hide('extract-actions'); renderExtraction(currentJob.extraction, currentJob.extractionSource);}
-    else show('extract-actions');
+    if (currentJob.approvedRequirements) {renderApproved(currentJob.approvedRequirements);await loadAssessment();}
+    else if (currentJob.extraction) {hide('extract-actions');renderExtraction(currentJob.extraction,currentJob.extractionSource);byId('requirements-section').open=true;}
+    else {show('extract-actions');byId('requirements-section').open=true;}
   } catch(error) {notify(error.message, true);}
   finally {byId('extract-btn').disabled = false;}
 }
@@ -187,7 +189,7 @@ byId('extract-btn').addEventListener('click', async () => {
   try {
     const result = await api('/api/extract', {method: 'POST', body: JSON.stringify({jobId: currentJob.id})});
     currentJob.extraction = result.extraction; currentJob.extractionSource = result.source;
-    renderExtraction(result.extraction, result.source, result.similar);
+    byId('requirements-section').open=true;renderExtraction(result.extraction, result.source, result.similar);
     notify(result.source === 'exact-cache' ? 'Requirements loaded from your JD cache.' : 'Requirements extracted. Please review and approve.');
   } catch(error) {notify(error.message, true);}
   finally {button.disabled = false; button.textContent = 'Extract requirements with AI';}
@@ -209,6 +211,7 @@ byId('requirements-form').addEventListener('submit', async event => {
     const result = await api('/api/requirements', {method:'POST', body: JSON.stringify({jobId: currentJob.id, approved})});
     currentJob.approvedRequirements = result.approvedRequirements;
     renderApproved(result.approvedRequirements);
+    byId('requirements-section').open=false;byId('assessment-box').open=true;
     await loadAssessment();
     notify('Requirements approved. Select the assessment length to generate your questions.');
   } catch(error) {notify(error.message, true);}
@@ -237,32 +240,34 @@ function drawQuestions() {
   if(workingQuestions.length!==currentAssessment.targetCount) return;
   const published=currentAssessment.status==='published';
   workingQuestions.forEach((q,i)=>{
-    const card=document.createElement('div'); card.className='question-card';
-    const heading=document.createElement('h3'); heading.textContent=`Question ${i+1}`;
+    const card=document.createElement('details'); card.className='question-card editor-question';
+    card.open=i===0&&!published;
+    const heading=document.createElement('summary'); heading.className='editor-question-title'; heading.textContent=`Question ${i+1} · ${q.text.slice(0,90)}${q.text.length>90?'…':''}`;
     const tag=document.createElement('span');tag.className='tag';tag.textContent=q.source==='exact-cache'?'Exact cache':q.source==='similar-cache'?'Similar role':'New';
     heading.append(tag);card.append(heading);
+    const editor=document.createElement('div');editor.className='editor-question-content';
     const prompt=qEl(`Question ${i+1}`,q.text,3,650);prompt.disabled=published;
-    prompt.addEventListener('input',()=>{q.text=prompt.value;markChanged();});card.append(prompt);
+    prompt.addEventListener('input',()=>{q.text=prompt.value;markChanged();});editor.append(prompt);
     const meta=document.createElement('div');meta.className='two-col';
     const requirement=document.createElement('div');const reqLabel=document.createElement('label');reqLabel.textContent='Mapped JD requirement';
     const reqOptions=currentJob.approvedRequirements.requirements.map((r,index)=>`${index+1}. ${r.text}`);
     const reqSelect=selectField(reqOptions,reqOptions[q.requirementIndex],`Requirement for question ${i+1}`,value=>{
       q.requirementIndex=reqOptions.indexOf(value);markChanged();});reqSelect.disabled=published;requirement.append(reqLabel,reqSelect);
     const typeBox=document.createElement('div');const typeLabel=document.createElement('label');typeLabel.textContent='Question type';
-    const typeSelect=selectField(qTypes,q.type,`Question type ${i+1}`,value=>{q.type=value;markChanged();});typeSelect.disabled=published;typeBox.append(typeLabel,typeSelect);meta.append(requirement,typeBox);card.append(meta);
+    const typeSelect=selectField(qTypes,q.type,`Question type ${i+1}`,value=>{q.type=value;markChanged();});typeSelect.disabled=published;typeBox.append(typeLabel,typeSelect);meta.append(requirement,typeBox);editor.append(meta);
     const grid=document.createElement('div');grid.className='options-grid';
     q.options.forEach((opt,j)=>{
       const cell=document.createElement('div');const label=document.createElement('label');label.textContent=`Option ${'ABCD'[j]}`;
       const input=qEl(`Question ${i+1}, option ${'ABCD'[j]}`,opt,2,260);input.disabled=published;
       input.addEventListener('input',()=>{q.options[j]=input.value;markChanged();});cell.append(label,input);grid.append(cell);
-    });card.append(grid);
-    const answer=document.createElement('label');answer.textContent='Best answer';card.append(answer);
+    });editor.append(grid);
+    const answer=document.createElement('label');answer.textContent='Best answer';editor.append(answer);
     const answerSelect=selectField(['A','B','C','D'],'ABCD'[q.correctIndex],`Best answer for question ${i+1}`,value=>{q.correctIndex='ABCD'.indexOf(value);markChanged();});
-    answerSelect.disabled=published;card.append(answerSelect);
-    const why=document.createElement('label');why.textContent='Why this is the best answer (recruiter only)';card.append(why);
+    answerSelect.disabled=published;editor.append(answerSelect);
+    const why=document.createElement('label');why.textContent='Why this is the best answer (recruiter only)';editor.append(why);
     const rationale=qEl(`Explanation for question ${i+1}`,q.rationale,3,700);rationale.disabled=published;
-    rationale.addEventListener('input',()=>{q.rationale=rationale.value;markChanged();});card.append(rationale);
-    container.append(card);
+    rationale.addEventListener('input',()=>{q.rationale=rationale.value;markChanged();});editor.append(rationale);
+    card.append(editor);container.append(card);
   });
   if(!published) show('assessment-actions');
 }
@@ -289,14 +294,15 @@ async function loadAssessment() {
   workingQuestions=(currentAssessment?.questions||[]).map(q=>({...q,options:[...q.options]}));
   savedSnapshot=JSON.stringify(workingQuestions);
   assessmentDisplay();
-  if (currentAssessment?.status === 'published') await loadCandidates(); else hide('candidates-box');
+  if (currentAssessment?.status === 'published') {await loadCandidates();byId('candidates-box').open=true;}
+  else {hide('candidates-box');byId('assessment-box').open=true;}
 }
 byId('start-assessment-btn').addEventListener('click',async()=>{
   if(!currentJob?.approvedRequirements)return;
   clearNotification();const btn=byId('start-assessment-btn');btn.disabled=true;
   try{
     const result=await api('/api/assessment',{method:'POST',body:JSON.stringify({action:'start',jobId:currentJob.id,targetCount:Number(byId('question-count').value)})});
-    currentAssessment=result.assessment;workingQuestions=(result.assessment.questions||[]).map(q=>({...q,options:[...q.options]}));
+    byId('assessment-box').open=true;currentAssessment=result.assessment;workingQuestions=(result.assessment.questions||[]).map(q=>({...q,options:[...q.options]}));
     savedSnapshot=JSON.stringify(workingQuestions);assessmentDisplay();
     notify('Assessment draft created. Select Generate questions to begin.');
   }catch(error){notify(error.message,true);}finally{btn.disabled=false;}
@@ -331,7 +337,7 @@ byId('publish-btn').addEventListener('click',async()=>{
   clearNotification();const btn=byId('publish-btn');btn.disabled=true;
   try{
     await api('/api/assessment',{method:'POST',body:JSON.stringify({action:'publish',jobId:currentJob.id})});
-    await loadAssessment();notify('Assessment published. You can now configure duration and invite pilot candidates below.');
+    await loadAssessment();byId('assessment-box').open=false;byId('candidates-box').open=true;notify('Assessment published. You can now configure duration and invite pilot candidates below.');
   }catch(error){notify(error.message,true);btn.disabled=false;}
 });
 
@@ -435,7 +441,9 @@ async function openReport(id){
     const list=el('ul');(r.integrity.events||[]).forEach(e=>list.append(el('li',`${new Date(e.at).toLocaleString('en-IN')}: ${e.type.replaceAll('_',' ')} (question ${e.questionIndex+1})`)));
     events.append(list);info.append(events);content.append(info);
     const caveats=el('div',undefined,'callout');r.limitations.forEach(x=>caveats.append(el('p',x)));
-    content.append(caveats);show('report-box');byId('report-box').scrollIntoView({behavior:'smooth'});
+    content.append(caveats);show('report-box');
+    // Opening a report is explicit navigation; unlike ordinary actions, reveal its header.
+    byId('report-box').scrollIntoView({behavior:'smooth',block:'start'});
   }catch(error){notify(error.message,true);}
 }
 

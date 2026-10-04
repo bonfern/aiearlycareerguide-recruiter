@@ -3,10 +3,10 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
   <title>Secure Candidate Assessment | AI Early Career Guide</title>
-  <link rel="stylesheet" href="/style.css"><script type="module" src="/candidate.js"></script>
+  <link rel="icon" type="image/png" href="/assets/brand-icon.png"><link rel="stylesheet" href="/style.css"><script type="module" src="/candidate.js"></script>
 </head>
 <body class="candidate-site">
-<header class="site-header"><div class="brand"><span class="brand-mark">AI</span><span>AI EARLY CAREER GUIDE<small>Secure Candidate Assessment</small></span></div><span class="tag">Private invitation</span></header>
+<header class="site-header"><div class="brand"><img class="brand-logo" src="/assets/brand-logo.png" alt="AI Early Career Guide — Explore Today. Brighter Tomorrows." /><span class="brand-product">Secure Candidate Assessment</span></div><span class="tag">Private invitation</span></header>
 <main class="candidate-main">
   <div id="candidate-message" class="message hidden" role="alert"></div>
   <section id="candidate-loading" class="card narrow"><h1>Loading your invitation…</h1><p class="muted">Please wait.</p></section>
@@ -25,21 +25,20 @@
     <ul class="instruction-list"><li>One overall timer starts when you select Start. It cannot be paused, even if you disconnect.</li>
       <li>You can go back, change answers and move between questions before time runs out.</li>
       <li>Answers are saved to the server as you select them. The assessment submits automatically when time expires.</li>
-      <li>With your acknowledgement, we record tab changes, fullscreen exit, copy/paste and inactivity indicators. We do not access your camera or microphone.</li>
+      <li>With your acknowledgement, we record tab changes, window focus, copy/paste and inactivity indicators. We do not access your camera or microphone.</li>
       <li>Browser events may have innocent explanations; the recruiter reviews them separately from your competency results.</li></ul>
     <label class="consent"><input id="candidate-consent" type="checkbox"> I understand the timed assessment and browser activity logging and will complete it independently.</label>
-    <label class="consent"><input id="fullscreen-opt-in" type="checkbox"> Attempt optional fullscreen mode (if your browser supports it).</label>
     <button type="button" id="begin-assessment" disabled>Start assessment</button>
-    <p class="muted fine">You may complete the assessment without fullscreen. Choosing fullscreen does not prevent using another device.</p>
+    <p class="muted fine">The assessment uses a comfortable, fixed-width layout. Browser fullscreen is not required.</p>
   </section>
   <section id="candidate-test" class="card hidden">
     <div class="candidate-top"><div><p class="eyebrow">TIMED ASSESSMENT</p><h1 id="candidate-role">Assessment</h1><span id="candidate-progress" class="muted"></span></div>
-      <div class="timer-card"><small>TIME REMAINING</small><strong id="candidate-timer">—</strong></div></div>
+      <div class="test-tools"><button type="button" class="secondary compact" id="focus-toggle" aria-pressed="false">Focus view</button><div class="timer-card"><small>TIME REMAINING</small><strong id="candidate-timer">—</strong></div></div></div>
     <div id="candidate-question-nav" class="question-nav" aria-label="Go to question"></div>
     <div class="question-card" id="candidate-question"><h2 id="candidate-question-title"></h2><p id="candidate-question-text"></p><fieldset id="candidate-options"></fieldset>
       <p id="answer-save-status" class="muted fine" aria-live="polite">Your answers are saved as you select them.</p></div>
-    <div class="candidate-actions"><button id="candidate-prev" class="secondary" type="button">← Previous</button><button id="candidate-next" type="button">Next →</button><button id="candidate-submit" class="secondary" type="button">Finish and submit</button></div>
-    <p class="muted fine">Your countdown continues if you leave this page. Please finish before the deadline.</p>
+    <div class="candidate-actions"><button id="candidate-prev" class="secondary" type="button">← Previous</button><button id="candidate-next" type="button">Next →</button><button id="candidate-submit" class="hidden" type="button">Review &amp; submit</button></div>
+    <p class="muted fine">Your countdown continues if you leave this page. Submit on the final question or when the timer ends.</p>
   </section>
   <section id="candidate-done" class="card narrow hidden"><p class="eyebrow">ASSESSMENT RECEIVED</p><h1>Thank you</h1><p id="completion-message">Your assessment has been submitted. You may close this page.</p><p class="muted fine">Your individual evidence report is available only to the recruiter.</p></section>
 </main><footer>© AI Early Career Guide · Assessment integrity indicators are not proof of cheating</footer>

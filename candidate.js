@@ -5,8 +5,9 @@ const views=['candidate-loading','candidate-verify','candidate-ready','candidate
 const view=id=>{views.forEach(hide);show(id);};
 const invite=new URL(location.href).searchParams.get('invite');
 const storeKey=`recruiter-assessment-session:${invite}`;
-let session=sessionStorage.getItem(storeKey),model=null,index=0,deadline=0,serverOffset=0,busy=false,finished=false;
-let role='',duration=0,tick=null,idle=false,idleTimeout=null,events=[],flushing=false,enteredFullscreen=false;
+let session=sessionStorage.getItem(storeKey),model=null,index=0,deadline=0,serverOffset=0,finished=false;
+let pendingAnswerSave=null,navigating=false,lastSaveFailed=false;
+let role='',duration=0,tick=null,idle=false,idleTimeout=null,events=[],flushing=false;
 const errorText=(error)=>error instanceof Error?error.message:String(error);
 function notify(text,isError=true){const box=byId('candidate-message');box.textContent=text;box.classList.toggle('error',isError);show('candidate-message');}
 function clearMessage(){hide('candidate-message');}
@@ -41,7 +42,9 @@ function receiveState(next){
   if(next.status==='verified')return renderReady();
   if(next.status!=='started')return view('candidate-verify');
   index=next.currentIndex||0;deadline=next.deadlineAt;serverOffset=next.serverTime-Date.now();finished=false;
-  view('candidate-test');byId('candidate-role').textContent=role||'Candidate assessment';renderQuestion();updateTimer();
+  // Do not hide and re-show the entire test on every question: doing so resets browser scroll.
+  if(byId('candidate-test').classList.contains('hidden'))view('candidate-test');
+  byId('candidate-role').textContent=role||'Candidate assessment';renderQuestion();updateTimer();
   if(!tick)tick=setInterval(updateTimer,1000);scheduleIdle();
 }
 function renderReady(){view('candidate-ready');byId('ready-description').textContent=`${role}: ${duration} minutes. Your timer begins only when you click Start assessment.`;}
@@ -72,65 +75,115 @@ byId('begin-assessment').addEventListener('click',async()=>{
   if(!byId('candidate-consent').checked)return;
   byId('begin-assessment').disabled=true;clearMessage();
   try{const result=await candidateApi('start');receiveState(result.assessment);
-    if(byId('fullscreen-opt-in').checked){
-      if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen()
-        .then(()=>{enteredFullscreen=true;}).catch(()=>queueEvent('fullscreen_unavailable'));
-      else queueEvent('fullscreen_unavailable');
-    }
   }catch(error){notify(errorText(error));byId('begin-assessment').disabled=false;}
 });
+// Answer-save and navigation are coordinated. Clicking Next while saving queues the move
+// behind the save instead of silently ignoring the first click.
+function updateQuestionProgress(){
+  if(!model?.questions)return;
+  const answered=model.questions.filter(q=>q.selected!==null).length;
+  byId('candidate-progress').textContent=`${answered} of ${model.questions.length} answered`;
+  const nav=byId('candidate-question-nav');
+  for(const [i,button] of [...nav.children].entries()){
+    button.classList.toggle('current',i===index);
+    button.classList.toggle('answered',model.questions[i]?.selected!==null);
+    button.setAttribute('aria-current',i===index?'step':'false');
+  }
+}
 function renderQuestion(){
   if(!model||model.status!=='started')return;
   const questions=model.questions||[];
   const q=questions[index];if(!q)return;
   byId('candidate-question-title').textContent=`Question ${index+1} of ${questions.length}`;
   byId('candidate-question-text').textContent=q.text;
-  byId('candidate-progress').textContent=`${questions.filter(x=>x.selected!==null).length} of ${questions.length} answered`;
   const box=byId('candidate-options');box.replaceChildren();
   q.options.forEach((option,choice)=>{
     const label=document.createElement('label');label.className='candidate-option';
     const input=document.createElement('input');input.type='radio';input.name='choice';input.value=String(choice);input.checked=q.selected===choice;
-    input.addEventListener('change',async()=>{
-      if(busy)return;busy=true;byId('answer-save-status').textContent='Saving your answer…';
-      try{const result=await candidateApi('answer',{questionId:q.id,selected:choice});
-        if(result.assessment.status==='completed')return showDone(result.assessment.finishReason);
-        model=result.assessment;byId('answer-save-status').textContent='Answer saved.';
-        byId('candidate-progress').textContent=`${model.questions.filter(x=>x.selected!==null).length} of ${model.questions.length} answered`;
-      }catch(error){byId('answer-save-status').textContent='Not saved; please retry.';notify(errorText(error));input.checked=false;}
-      finally{busy=false;}
-    });label.append(input,document.createTextNode(`${'ABCD'[choice]}. ${option}`));box.append(label);
+    input.addEventListener('change',()=>{
+      if(navigating||pendingAnswerSave)return;
+      lastSaveFailed=false;
+      const choices=[...box.querySelectorAll('input')];choices.forEach(item=>item.disabled=true);
+      byId('answer-save-status').textContent='Saving your answer…';
+      const request=(async()=>{
+        try{
+          const result=await candidateApi('answer',{questionId:q.id,selected:choice});
+          if(result.assessment.status==='completed'){showDone(result.assessment.finishReason);return;}
+          model=result.assessment;
+          byId('answer-save-status').textContent='Answer saved.';
+          updateQuestionProgress();
+        }catch(error){
+          lastSaveFailed=true;
+          byId('answer-save-status').textContent='Not saved. Select your answer again to retry.';
+          notify(errorText(error));input.checked=false;
+        }finally{choices.forEach(item=>item.disabled=false);}
+      })();
+      pendingAnswerSave=request;
+      request.finally(()=>{if(pendingAnswerSave===request)pendingAnswerSave=null;});
+    });
+    label.append(input,document.createTextNode(`${'ABCD'[choice]}. ${option}`));box.append(label);
   });
   byId('candidate-prev').disabled=index===0;
-  byId('candidate-next').disabled=index>=questions.length-1;
+  byId('candidate-next').classList.toggle('hidden',index===questions.length-1);
+  byId('candidate-submit').classList.toggle('hidden',index!==questions.length-1);
   byId('answer-save-status').textContent='Your answer is saved when selected.';
   const nav=byId('candidate-question-nav');nav.replaceChildren();questions.forEach((item,i)=>{
     const b=document.createElement('button');b.type='button';b.textContent=String(i+1);
     b.className=`question-nav-item ${i===index?'current':''} ${item.selected!==null?'answered':''}`;
     b.setAttribute('aria-label',`Go to question ${i+1}${item.selected!==null?', answered':''}`);
+    if(i===index)b.setAttribute('aria-current','step');
     b.addEventListener('click',()=>navigate(i));nav.append(b);
   });
+  updateQuestionProgress();
 }
 async function navigate(next){
-  if(!model||busy||next===index||next<0||next>=model.questions.length)return;
-  busy=true;clearMessage();
-  try{const result=await candidateApi('navigate',{index:next});if(result.assessment.status==='completed')return showDone(result.assessment.finishReason);
-    receiveState(result.assessment);}
-  catch(error){notify(errorText(error));}finally{busy=false;}
+  if(!model||finished||navigating||next===index||next<0||next>=model.questions.length)return;
+  navigating=true;clearMessage();
+  const nextButton=byId('candidate-next');
+  nextButton.textContent='Moving…';
+  try{
+    if(pendingAnswerSave)await pendingAnswerSave;
+    if(lastSaveFailed||finished)return;
+    const result=await candidateApi('navigate',{index:next});
+    if(result.assessment.status==='completed')return showDone(result.assessment.finishReason);
+    receiveState(result.assessment);
+    // Keep the current page position. Only reveal the question if it is below the fold.
+    const area=byId('candidate-question');const rect=area.getBoundingClientRect();
+    if(rect.top>window.innerHeight-130)area.scrollIntoView({block:'nearest',behavior:'instant'});
+  }catch(error){notify(errorText(error));}
+  finally{navigating=false;nextButton.textContent='Next →';}
 }
 byId('candidate-prev').addEventListener('click',()=>navigate(index-1));
 byId('candidate-next').addEventListener('click',()=>navigate(index+1));
 let submitting=false;
 async function finishAssessment(reason){
   if(submitting||finished)return;
-  if(reason==='manual'&&!confirm('Submit your answers now? You will not be able to return.'))return;
-  submitting=true;busy=true;clearMessage();
-  try{const result=await candidateApi('submit');if(result.status==='completed')showDone(reason==='time'?'time_expired':'submitted');
-    else notify('Unable to finish yet. Please check your connection and try again.');}
-  catch(error){notify(`Your answers remain saved. We will retry submission when connected. ${errorText(error)}`);
-    if(reason==='time')setTimeout(()=>{if(!finished)finishAssessment('time');},5000);}
-  finally{submitting=false;busy=false;}
+  if(reason==='manual'){
+    // Warn about unanswered questions without changing the question or losing scroll.
+    const answered=model?.questions?.filter(q=>q.selected!==null).length||0;
+    const total=model?.questions?.length||0;
+    const message=answered===total?'Submit your answers now? You will not be able to return.':
+      `${total-answered} of ${total} questions remain unanswered. Submit anyway? You will not be able to return.`;
+    if(!confirm(message))return;
+  }
+  submitting=true;clearMessage();
+  try{
+    if(pendingAnswerSave)await pendingAnswerSave;
+    if(reason==='manual'&&lastSaveFailed){notify('Your last answer has not been saved. Please retry before submitting.');return;}
+    const result=await candidateApi('submit');
+    if(result.status==='completed')showDone(reason==='time'?'time_expired':'submitted');
+    else notify('Unable to finish yet. Please check your connection and try again.');
+  }catch(error){
+    notify(`Your saved answers are retained. We will retry submission when connected. ${errorText(error)}`);
+    if(reason==='time')setTimeout(()=>{if(!finished)finishAssessment('time');},5000);
+  }finally{submitting=false;}
 }
 byId('candidate-submit').addEventListener('click',()=>finishAssessment('manual'));
+byId('focus-toggle').addEventListener('click',()=>{
+  const enabled=document.body.classList.toggle('focus-mode');
+  byId('focus-toggle').textContent=enabled?'Exit focus view':'Focus view';
+  byId('focus-toggle').setAttribute('aria-pressed',String(enabled));
+});
 async function flushEvents(){
   if(flushing||!session||!model||model.status!=='started')return;
   flushing=true;try{while(events.length){
@@ -149,7 +202,6 @@ for(const name of ['pointerdown','keydown'])document.addEventListener(name,()=>{
 document.addEventListener('visibilitychange',()=>queueEvent(document.hidden?'tab_hidden':'tab_visible'));
 window.addEventListener('blur',()=>queueEvent('window_blur'));
 window.addEventListener('focus',()=>{queueEvent('window_focus');flushEvents();});
-document.addEventListener('fullscreenchange',()=>{if(enteredFullscreen&&!document.fullscreenElement){enteredFullscreen=false;queueEvent('fullscreen_exit');}});
 document.addEventListener('copy',()=>queueEvent('copy'));
 document.addEventListener('paste',()=>queueEvent('paste'));
 window.addEventListener('offline',()=>queueEvent('offline'));

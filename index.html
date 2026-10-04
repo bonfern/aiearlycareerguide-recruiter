@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="description" content="AI Early Career Guide - Recruiter Assessments" />
   <title>Recruiter Assessments | AI Early Career Guide</title>
+  <link rel="icon" type="image/png" href="/assets/brand-icon.png" />
   <link rel="stylesheet" href="/style.css" />
   <script type="module" src="/app.js"></script>
 </head>
 <body>
   <header class="site-header">
-    <div class="brand"><span class="brand-mark">AI</span><span>AI EARLY CAREER GUIDE <small>Recruiter Assessments</small></span></div>
+    <a class="brand brand-link" href="/" aria-label="AI Early Career Guide — Recruiter Assessments"><img class="brand-logo" src="/assets/brand-logo.png" alt="AI Early Career Guide — Explore Today. Brighter Tomorrows." /><span class="brand-product">Recruiter Assessments</span></a>
     <button id="logout" class="secondary hidden" type="button">Sign out</button>
   </header>
   <main>
@@ -38,11 +39,14 @@
         <div class="stat"><span>Candidates</span><strong id="total-candidates">0</strong></div>
         <div class="stat"><span>Completed</span><strong id="total-completed">0</strong></div>
       </div>
-      <section class="card">
-        <div class="section-head"><h2>My jobs</h2><input type="search" id="search" placeholder="Search job title" aria-label="Search jobs" /></div>
+      <details class="card dashboard-jobs" open>
+        <summary class="workspace-summary"><span><strong>My jobs</strong><small>Search and manage your assessments</small></span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
+        <div class="dashboard-jobs-content">
+        <div class="section-head"><label for="search" class="muted">Search jobs</label><input type="search" id="search" placeholder="Search job title" aria-label="Search jobs" /></div>
         <div class="table-wrap"><table><thead><tr><th>Job title</th><th>Status</th><th>Candidates</th><th>Completed</th><th>Created</th><th>Action</th></tr></thead><tbody id="jobs-body"></tbody></table></div>
         <p class="muted" id="empty-state">No jobs yet. Select “Create job” to begin.</p>
-      </section>
+        </div>
+      </details>
     </section>
 
     <section id="create-panel" class="card hidden">
@@ -62,6 +66,9 @@
 
     <section id="job-panel" class="card hidden">
       <div class="section-head"><div><p class="eyebrow">STEP 2 · AI REQUIREMENT EXTRACTION</p><h1 id="detail-title">Job</h1><p class="muted" id="detail-status"></p></div><button id="detail-back-btn" type="button" class="secondary">Back to dashboard</button></div>
+      <details id="requirements-section" class="workspace-section" open>
+        <summary class="workspace-summary"><span><small>STEP 2</small><strong>JD and approved requirements</strong></span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
+        <div class="workspace-content">
       <details class="jd-preview"><summary>View original job description</summary><pre id="detail-jd"></pre></details>
       <div id="extract-actions" class="actions"><button id="extract-btn" type="button">Extract requirements with AI</button></div>
       <div id="extraction-box" class="hidden">
@@ -82,24 +89,12 @@
         </form>
       </div>
       <div id="approved-box" class="hidden"><p class="success">Requirements approved. Generate and review a role-specific choice-based assessment below.</p><div id="approved-list"></div></div>
-      <section id="candidates-box" class="hidden assessment-section">
-        <div class="section-head"><div><p class="eyebrow">STEP 4 · CONTROLLED PILOT</p><h2>Candidates &amp; evidence reports</h2></div><span class="tag" id="candidate-total">0 candidates</span></div>
-        <div class="callout">Each candidate gets a unique invitation, email OTP and a timed assessment. Browser activity is logged but is <strong>not proof of misconduct</strong>. This pilot is limited to 5 candidates per JD until payment credits are enabled.</div>
-        <div class="duration-control"><label for="assessment-duration">Overall assessment duration (minutes)</label>
-          <div class="actions"><input id="assessment-duration" type="number" min="10" max="120" step="1" value="40" />
-          <button class="secondary" type="button" id="save-duration-btn">Save duration</button></div>
-          <p class="muted fine">Default: 15 questions = 25 minutes; 25 = 40 minutes; 40 = 60 minutes. This becomes fixed after the first invitation.</p></div>
-        <form id="invite-form" class="candidate-invite-form">
-          <div class="two-col"><div><label for="candidate-name">Candidate name</label><input id="candidate-name" required minlength="2" maxlength="120" autocomplete="off" placeholder="Candidate's full name" /></div>
-            <div><label for="candidate-email">Candidate email</label><input id="candidate-email" required type="email" autocomplete="off" placeholder="candidate@example.com" /></div></div>
-          <div class="actions"><button id="invite-btn" type="submit">Send secure invitation</button></div>
-        </form>
-        <div id="invitation-result" class="callout hidden"><strong>Invitation link</strong><p id="invitation-note"></p><input id="invitation-link" readonly aria-label="Secure candidate invitation link" /><div class="actions"><button type="button" class="secondary" id="copy-invite-btn">Copy link</button></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Status</th><th>Email delivery</th><th>Added</th><th>Actions</th></tr></thead><tbody id="candidate-table"></tbody></table></div>
-        <p id="candidate-empty" class="muted fine">No invitations yet.</p>
-      </section>
-      <section id="assessment-box" class="hidden assessment-section">
-        <div class="section-head"><div><p class="eyebrow">STEP 3 · ASSESSMENT</p><h2>Choice-based assessment</h2></div><span class="tag" id="assessment-status">Not started</span></div>
+        </div>
+      </details>
+      <details id="assessment-box" class="hidden workspace-section assessment-section">
+        <summary class="workspace-summary"><span><small>STEP 3</small><strong>Assessment and question bank</strong></span><span class="tag" id="assessment-status">Not started</span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
+        <div class="workspace-content">
+
         <div id="assessment-setup">
           <p class="muted">Generate a recruiter-reviewed question bank for this JD. Similar approved roles may reduce AI generation costs.</p>
           <label for="question-count">Assessment length</label>
@@ -114,8 +109,29 @@
           <div id="assessment-actions" class="actions hidden"><button type="button" id="save-questions-btn" class="secondary">Save edited questions</button><button type="button" id="publish-btn">Publish assessment</button></div>
           <p class="muted fine">Published questions remain locked. Set the overall duration before inviting your first candidate.</p>
         </div>
-      </section>
+        </div>
+      </details>
+      <details id="candidates-box" class="hidden workspace-section assessment-section">
+        <summary class="workspace-summary"><span><small>STEP 4</small><strong>Candidates and reports</strong></span><span class="tag" id="candidate-total">0 candidates</span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
+        <div class="workspace-content">
+
+        <div class="callout">Each candidate gets a unique invitation, email OTP and a timed assessment. Browser activity is logged but is <strong>not proof of misconduct</strong>. This pilot is limited to 5 candidates per JD until payment credits are enabled.</div>
+        <div class="duration-control"><label for="assessment-duration">Overall assessment duration (minutes)</label>
+          <div class="actions"><input id="assessment-duration" type="number" min="10" max="120" step="1" value="40" />
+          <button class="secondary" type="button" id="save-duration-btn">Save duration</button></div>
+          <p class="muted fine">Default: 15 questions = 25 minutes; 25 = 40 minutes; 40 = 60 minutes. This becomes fixed after the first invitation.</p></div>
+        <form id="invite-form" class="candidate-invite-form">
+          <div class="two-col"><div><label for="candidate-name">Candidate name</label><input id="candidate-name" required minlength="2" maxlength="120" autocomplete="off" placeholder="Candidate's full name" /></div>
+            <div><label for="candidate-email">Candidate email</label><input id="candidate-email" required type="email" autocomplete="off" placeholder="candidate@example.com" /></div></div>
+          <div class="actions"><button id="invite-btn" type="submit">Send secure invitation</button></div>
+        </form>
+        <div id="invitation-result" class="callout hidden"><strong>Invitation link</strong><p id="invitation-note"></p><input id="invitation-link" readonly aria-label="Secure candidate invitation link" /><div class="actions"><button type="button" class="secondary" id="copy-invite-btn">Copy link</button></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Status</th><th>Email delivery</th><th>Added</th><th>Actions</th></tr></thead><tbody id="candidate-table"></tbody></table></div>
+        <p id="candidate-empty" class="muted fine">No invitations yet.</p>
+        </div>
+      </details>
       <section id="report-box" class="hidden assessment-section">
+        <div class="report-brand"><img src="/assets/brand-logo.png" alt="AI Early Career Guide"/><span>Recruiter assessment · Private evidence report</span></div>
         <div class="section-head"><h2 id="report-title">Evidence report</h2><div class="actions"><button class="secondary compact" type="button" id="report-print-btn">Print / save PDF</button><button class="secondary compact" type="button" id="report-close-btn">Close report</button></div></div>
         <div id="report-content"></div>
       </section>
