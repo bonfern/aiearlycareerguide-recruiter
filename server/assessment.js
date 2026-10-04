@@ -27,6 +27,20 @@ export default async function handler(req, res) {
     }
     if (!jobSnap.data().approvedRequirements) return res.status(409).json({error:'Approve requirements before generating questions'});
     const action = req.body?.action;
+    if (action === 'reset-draft') {
+      await user.db.runTransaction(async tx=>{
+        const [job,assessment]=await Promise.all([tx.get(jobRef),tx.get(ref)]);
+        if(!assessment.exists||assessment.data().orgId!==user.orgId||!job.exists||job.data().orgId!==user.orgId)
+          throw Object.assign(new Error('Unpublished assessment not found'),{status:404});
+        if(assessment.data().status!=='draft'||(job.data().candidateCount||0)>0)
+          throw Object.assign(new Error('Only unpublished drafts without invited candidates can be reset'),{status:409});
+        if(assessment.data().generationLock?.until>Date.now())
+          throw Object.assign(new Error('Please wait until question generation finishes'),{status:409});
+        tx.delete(ref);
+        tx.update(jobRef,{assessmentFocusDraft:null,assessmentFocusApproved:null,status:'requirements_approved',updatedAt:new Date()});
+      });
+      return res.status(200).json({ok:true});
+    }
     if (action === 'start') {
       const targetCount = Number(req.body.targetCount);
       if (!V2_SIZES[targetCount]) return res.status(400).json({error:'Choose 20, 30 or 40 questions'});

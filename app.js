@@ -259,7 +259,7 @@ function focusDisplay(){
 function drawFocus(){
   const list=byId('focus-list');list.replaceChildren();if(!workingFocus)return;
   const approved=currentJob?.approvedRequirements;
-  const allowed=approved.requirements.map((r,i)=>({r,i})).filter(({r})=>!['Experience','Qualification'].includes(r.category));
+  const allowed=approved.requirements.map((r,i)=>({r,i})).filter(({r})=>!['Experience','Qualification'].includes(r.category)&&!/\b(?:\d+\s*(?:-|–|to|\+)\s*\d*\s*years?|degree|diploma|graduat(?:e|ion)|education|bachelor|master|high school|prior employment|employment history)\b/i.test(r.text));
   workingFocus.groups.forEach((g,i)=>{
     const card=document.createElement('details');card.className='question-card focus-card';card.open=i===0;
     const head=el('summary',`Competency ${i+1}: ${g.name} · ${g.questionCount} questions`);head.className='editor-question-title';card.append(head);
@@ -360,7 +360,8 @@ function assessmentDisplay() {
   hide('assessment-setup');show('assessment-workspace');
   const a=currentAssessment;
   byId('assessment-status').textContent=displayStatus(a.status);
-  byId('generation-info').textContent=`${workingQuestions.length} of ${a.targetCount} questions prepared. ${a.reusedCount||0} approved questions reused. Each question targets a distinct scenario.${a.status==='published'?' Assessment published and locked.':''}`;
+  byId('generation-info').textContent=`${workingQuestions.length} of ${a.targetCount} questions prepared. ${a.reusedCount||0} approved questions reused. ${(a.blueprintDraftCount||a.blueprintDraft?.length)&&!a.blueprint?`Planning ${a.blueprintDraftCount??a.blueprintDraft.length} of ${a.targetCount} distinct topics. `:''}${a.status==='published'?'Assessment published and locked.':'Each question targets a distinct scenario.'}`;
+  if(a.status==='draft')show('reset-draft-btn');else hide('reset-draft-btn');
   if(a.status==='published') {hide('generation-controls');hide('assessment-actions');drawQuestions();return;}
   if(workingQuestions.length<a.targetCount) {
     show('generation-controls');hide('assessment-actions');
@@ -410,14 +411,23 @@ byId('generate-btn').addEventListener('click',async()=>{
         }
       }
       workingQuestions=result.questions.map(q=>({...q,options:[...q.options]}));
-      currentAssessment.questions=result.questions;currentAssessment.reusedCount=result.reusedCount;
+      currentAssessment.questions=result.questions;currentAssessment.reusedCount=result.reusedCount;currentAssessment.blueprintDraftCount=result.blueprintDraftCount;
       savedSnapshot=JSON.stringify(workingQuestions);assessmentDisplay();
-      if(result.progressMessage){byId('generation-info').textContent=result.progressMessage;}
+      if(result.progressMessage){byId('generation-info').textContent=result.progressMessage;processing(true,result.progressMessage);}
       if(result.done)break;
     }
     notify('Assessment questions are ready. Review and save any edits before publishing.');
   }catch(error){notify(`Generation paused: ${error.message} You can continue without losing completed batches.`,true);}
   finally{generating=false;assessmentDisplay();}
+});
+byId('reset-draft-btn').addEventListener('click',async()=>{
+  if(!currentAssessment||currentAssessment.status!=='draft')return;
+  if(!confirm('Delete this unpublished assessment draft and its saved questions so you can select a new skills-only focus? This cannot be undone. Your JD and approved requirements will be retained.'))return;
+  const button=byId('reset-draft-btn');button.disabled=true;clearNotification();
+  try{await api('/api/assessment',{method:'POST',body:JSON.stringify({jobId:currentJob.id,action:'reset-draft'})});
+    currentAssessment=null;workingQuestions=[];workingFocus=null;focusApproved=false;currentJob.assessmentFocusDraft=null;currentJob.assessmentFocusApproved=null;
+    assessmentDisplay();byId('assessment-box').open=true;notify('Unpublished draft cleared. Propose a new skills-only competency focus.');
+  }catch(error){notify(error.message,true);}finally{button.disabled=false;}
 });
 byId('save-questions-btn').addEventListener('click',async()=>{
   clearNotification();const btn=byId('save-questions-btn');btn.disabled=true;

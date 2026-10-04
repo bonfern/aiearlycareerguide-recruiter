@@ -1,3 +1,7 @@
+# IMPORTANT: V3.1 INSTALLATION
+
+For the latest model, timeout and skill-filter changes, **read [DEPLOY-V3.1.md](DEPLOY-V3.1.md) before uploading to GitHub**. The rest of this README documents the complete application and may refer to earlier V3 behaviour.
+
 # AI Early Career Guide — Recruiter Assessment V3
 
 **Independent Recruiter application** for `https://recruiter.aiearlycareerguide.com`. Student and Professional assessments remain in their existing repository and deployment.
