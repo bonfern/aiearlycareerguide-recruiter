@@ -5,6 +5,10 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from
 const byId = id => document.getElementById(id);
 const show = id => byId(id).classList.remove('hidden');
 const hide = id => byId(id).classList.add('hidden');
+const displayStatus=value=>({draft:'Draft',published:'Published',assessment_draft:'Assessment draft',
+  requirements_approved:'Requirements approved',invited:'Invited',started:'In progress',completed:'Completed',
+  expired:'Expired',verified:'Verified',time_expired:'Time expired'}[value]||
+  String(value||'Unknown').replaceAll('_',' ').replace(/^./,letter=>letter.toUpperCase()));
 let auth;
 let jobs = [];
 let currentJob = null;
@@ -15,6 +19,17 @@ let savedSnapshot = "";
 let generating = false;
 let workingFocus = null;
 let focusApproved = false;
+let activeRequests=0;
+const actionLabels={assessment:'Preparing assessment…',candidate:'Loading candidate data…',focus:'Reviewing critical competencies…',extract:'Extracting job requirements…',
+  'generate-questions':'Generating distinct questions and checking quality…',invitations:'Updating candidate invitations…',
+  invite:'Sending invitation…',jobs:'Loading jobs…',job:'Saving job details…',report:'Preparing candidate report…',
+  'parse-jd':'Reading job description…',requirements:'Saving approved requirements…'};
+function processing(visible,message){
+  const panel=byId('processing-status');if(!panel)return;
+  if(visible){panel.textContent=message||'Processing your request…';panel.classList.remove('hidden');}
+  else panel.classList.add('hidden');
+}
+
 
 function notify(text, error = false) {
   const box = byId('message'); box.textContent = text; box.classList.toggle('error', error);
@@ -32,10 +47,15 @@ async function api(url, options = {}) {
   if (!user) throw new Error('Please sign in');
   const headers = {Authorization: `Bearer ${await user.getIdToken()}`};
   if (options.body) headers['Content-Type'] = 'application/json';
-  const response = await fetch(url, {...options, headers: {...headers, ...(options.headers || {})}});
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
-  return data;
+  const endpoint=url.split('?')[0].split('/').pop();activeRequests++;
+  processing(true,actionLabels[endpoint]||'Processing your request…');
+  try{
+    const response=await fetch(url,{...options,headers:{...headers,...(options.headers||{})}});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||`Request failed (${response.status})`);
+    return data;
+  }finally{activeRequests=Math.max(0,activeRequests-1);if(!activeRequests)processing(false);}
+
 }
 function renderJobs(filter = '') {
   const tbody = byId('jobs-body'); tbody.replaceChildren();
@@ -44,7 +64,7 @@ function renderJobs(filter = '') {
     const tr = document.createElement('tr');
     const title = document.createElement('td'); title.textContent = job.title;
     const status = document.createElement('td'); const tag = document.createElement('span');
-    tag.className = 'tag'; tag.textContent = job.status.replaceAll('_', ' '); status.append(tag);
+    tag.className = 'tag'; tag.textContent = displayStatus(job.status); status.append(tag);
     const candidates = document.createElement('td'); candidates.textContent = String(job.candidateCount);
     const completed = document.createElement('td'); completed.textContent = String(job.completedCount);
     const created = document.createElement('td'); created.textContent = job.createdAt ? new Date(job.createdAt).toLocaleDateString('en-IN') : '—';
@@ -89,7 +109,7 @@ async function openJob(id) {
   try {
     currentJob = (await api(`/api/job?id=${encodeURIComponent(id)}`)).job;
     byId('detail-title').textContent = currentJob.title;
-    byId('detail-status').textContent = `Status: ${currentJob.status.replaceAll('_',' ')}`;
+    byId('detail-status').textContent = `Status: ${displayStatus(currentJob.status)}`;
     byId('detail-jd').textContent = currentJob.jdText;
     if (currentJob.approvedRequirements) {renderApproved(currentJob.approvedRequirements);await loadAssessment();}
     else if (currentJob.extraction) {hide('extract-actions');renderExtraction(currentJob.extraction,currentJob.extractionSource);byId('requirements-section').open=true;}
@@ -220,7 +240,7 @@ byId('requirements-form').addEventListener('submit', async event => {
   finally {button.disabled = false;}
 });
 
-// V2 — recruiter-controlled critical competency focus. Existing V1 assessments remain read-only and unchanged.
+// V3 — recruiter-controlled critical competency focus. Published V1/V2 assessments are preserved.
 function focusDisplay(){
   if(currentAssessment){hide('assessment-setup');return;}
   show('assessment-setup');
@@ -339,8 +359,8 @@ function assessmentDisplay() {
   if(!currentAssessment) {show('assessment-setup');hide('assessment-workspace');byId('assessment-status').textContent='Not started';focusDisplay();return;}
   hide('assessment-setup');show('assessment-workspace');
   const a=currentAssessment;
-  byId('assessment-status').textContent=a.status;
-  byId('generation-info').textContent=`${workingQuestions.length} of ${a.targetCount} questions prepared. ${a.reusedCount||0} reused from your organisation’s published question cache.${a.status==='published'?' Assessment published and locked.':''}`;
+  byId('assessment-status').textContent=displayStatus(a.status);
+  byId('generation-info').textContent=`${workingQuestions.length} of ${a.targetCount} questions prepared. ${a.reusedCount||0} approved questions reused. Each question targets a distinct scenario.${a.status==='published'?' Assessment published and locked.':''}`;
   if(a.status==='published') {hide('generation-controls');hide('assessment-actions');drawQuestions();return;}
   if(workingQuestions.length<a.targetCount) {
     show('generation-controls');hide('assessment-actions');
@@ -376,10 +396,23 @@ byId('generate-btn').addEventListener('click',async()=>{
   generating=true;clearNotification();assessmentDisplay();
   try{
     while(workingQuestions.length<currentAssessment.targetCount){
-      const result=await api('/api/generate-questions',{method:'POST',body:JSON.stringify({jobId:currentJob.id})});
+      // One AI request per serverless call; retry only a failed quality check, not
+      // authentication, quota or model errors. Previously saved batches remain intact.
+      let result;
+      for(let retry=0;retry<3;retry++){
+        try{
+          result=await api('/api/generate-questions',{method:'POST',body:JSON.stringify({jobId:currentJob.id})});
+          break;
+        }catch(error){
+          const qualityError=/question quality check|question blueprint|repeats an assessment topic|repeats a scenario/i.test(error.message);
+          if(!qualityError||retry===2)throw error;
+          byId('generation-info').textContent=`Revising questions that failed the quality check (attempt ${retry+2} of 3)…`;
+        }
+      }
       workingQuestions=result.questions.map(q=>({...q,options:[...q.options]}));
       currentAssessment.questions=result.questions;currentAssessment.reusedCount=result.reusedCount;
       savedSnapshot=JSON.stringify(workingQuestions);assessmentDisplay();
+      if(result.progressMessage){byId('generation-info').textContent=result.progressMessage;}
       if(result.done)break;
     }
     notify('Assessment questions are ready. Review and save any edits before publishing.');
@@ -422,7 +455,7 @@ async function loadCandidates(){
   invitations.forEach(item=>{
     const tr=el('tr');
     const name=el('td');name.append(el('strong',item.name),el('div',item.email,'muted fine'));
-    const status=el('td',item.status.replaceAll('_',' '));
+    const status=el('td',displayStatus(item.status));
     const delivery=el('td',item.deliveryStatus);
     const added=el('td',new Date(item.invitedAt).toLocaleDateString('en-IN'));
     const actions=el('td');const row=el('div',undefined,'actions compact-actions');
@@ -524,20 +557,69 @@ function renderV2Report(parent,r){
   renderEvidenceQuestions(parent,r);
   const caveats=el('div',undefined,'callout');r.limitations.forEach(x=>caveats.append(el('p',x)));parent.append(caveats);
 }
+function renderV3Report(parent,r){
+  const profile=r.profile||{};
+  const executive=el('section',undefined,'report-executive');
+  executive.append(el('h3','Candidate assessment summary'),el('p',profile.summary||'Assessment summary unavailable.'));
+  const highlights=el('div',undefined,'report-highlights');
+  for(const [title,items] of [['What the responses showed',profile.strengths],['Areas to explore in the interview',profile.weaknesses]]){
+    if(!items?.length)continue;
+    const box=el('section',undefined,'report-highlight');box.append(el('h4',title));
+    const list=el('ul');items.forEach(item=>{
+      const li=el('li');li.textContent=`${item.statement}${item.questionNumbers?.length?` (Questions ${item.questionNumbers.join(', ')})`:''}`;
+      list.append(li);
+    });box.append(list);highlights.append(box);
+  }
+  executive.append(highlights);parent.append(executive);
+  const groups=el('section',undefined,'report-executive');groups.append(el('h3','Performance by competency'));
+  r.competencies.filter(c=>c.total>0).forEach(c=>{
+    const row=el('div',undefined,'report-competency');
+    const title=el('div',undefined,'report-competency-header');title.append(el('strong',c.name),el('span',`${c.correct}/${c.total} · ${c.score}%`));row.append(title);
+    const track=el('div',undefined,'report-progress'),fill=el('div',undefined,'report-progress-fill');fill.style.width=`${c.score}%`;track.append(fill);row.append(track);
+    const relevant=r.details.filter(q=>q.competency===c.name);
+    const right=relevant.filter(q=>q.isCorrect).length;
+    const level=c.score>=80?'High score':c.score>=60?'Mixed results':'Requires further exploration';
+    row.append(el('p',`${level} · ${right} correct, ${relevant.length-right} missed`, 'muted'));
+    groups.append(row);
+  });groups.append(el('p','These scores describe answers to the tested questions, not demonstrated workplace ability.','muted fine'));parent.append(groups);
+  const validation=el('section',undefined,'report-executive');validation.append(el('h3','Suggested interview validation'));
+  const list=el('ol',undefined,'interview-validation');
+  (profile.interviewValidation||[]).forEach(v=>{
+    const item=el('li');item.append(el('strong',v.competency),el('p',v.question),el('p',`What to look for: ${v.lookFor}`,'muted fine'));
+    list.append(item);
+  });
+  if(!list.children.length)validation.append(el('p','Ask the candidate to explain how they would apply their answers to real workplace situations.'));
+  else validation.append(list);
+  parent.append(validation);
+  const timing=el('section',undefined,'report-executive');timing.append(el('h3','Assessment time and browser activity'));
+  reportLine(timing,'Average time per question',`${Math.round(r.elapsedSeconds/Math.max(1,r.total))} seconds`);
+  reportLine(timing,'Sustained tab changes',r.integrity.confirmedTabChanges||0);
+  timing.append(el('p',r.integrity.description,'muted fine'));
+  if(r.integrity.events?.length){const events=el('details');events.append(el('summary','View recorded tab changes'));
+    const eventList=el('ul');r.integrity.events.forEach(e=>eventList.append(el('li',`${e.seconds}s away from assessment · Question ${(e.questionIndex||0)+1}`)));
+    events.append(eventList);timing.append(events);
+  }
+  parent.append(timing);
+  renderEvidenceQuestions(parent,r);
+  const note=el('section',undefined,'report-disclaimer');note.append(el('h3','About this assessment'));
+  (r.limitations||[]).forEach(x=>note.append(el('p',x)));parent.append(note);
+}
 async function openReport(id){
   hide('report-box');clearNotification();
   try{
     const {report:r}=await api(`/api/report?invitationId=${encodeURIComponent(id)}`);
-    byId('report-title').textContent=`${r.candidateName} — ${r.jobTitle}`;
+    byId('report-title').textContent=`${r.candidateName} · ${r.jobTitle}`;
     const content=byId('report-content');content.replaceChildren();
     const intro=el('div',undefined,'report-intro');intro.append(el('p','Assessment evidence, not an automated hiring decision.','muted'));
     const summary=el('div',undefined,'report-metrics');
-    for(const [label,value] of [['Score',`${r.score}% (${r.correct}/${r.total})`],['Attempted',`${r.attempted}/${r.total}`],
-      ['Time',`${Math.floor(r.elapsedSeconds/60)}m ${r.elapsedSeconds%60}s`],['Outcome',r.finishReason.replaceAll('_',' ')]]){
+    const metrics=r.reportVersion===3?[['Score',`${r.score}% (${r.correct}/${r.total})`],['Questions answered',`${r.attempted}/${r.total}`],['Time taken',`${Math.floor(r.elapsedSeconds/60)}m ${r.elapsedSeconds%60}s`]]:
+      [['Score',`${r.score}% (${r.correct}/${r.total})`],['Attempted',`${r.attempted}/${r.total}`],
+      ['Time',`${Math.floor(r.elapsedSeconds/60)}m ${r.elapsedSeconds%60}s`],['Outcome',r.finishReason.replaceAll('_',' ')]];
+    for(const [label,value] of metrics){
       const box=el('div',undefined,'report-metric');box.append(el('span',label),el('strong',value));summary.append(box);}
-    intro.append(summary);reportLine(intro,'Assessment version',r.assessmentVersion);reportLine(intro,'Candidate email',r.candidateEmail);
+    intro.append(summary);if(r.reportVersion!==3)reportLine(intro,'Assessment version',r.assessmentVersion);
     content.append(intro);
-    if(r.reportVersion===2){renderV2Report(content,r);}else{
+    if(r.reportVersion===3){renderV3Report(content,r);}else if(r.reportVersion===2){renderV2Report(content,r);}else{
     content.append(el('h3','Legacy competency evidence'));
     const table=el('table');const head=el('tr');['JD requirement','Correct / asked','Rating'].forEach(x=>head.append(el('th',x)));table.append(head);
     r.competencies.forEach(c=>{const row=el('tr');row.append(el('td',c.requirement),el('td',`${c.correct}/${c.total}`),el('td',c.level));table.append(row);});content.append(table);

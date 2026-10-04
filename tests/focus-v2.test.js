@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateFocus,focusSignature,nextAssignments,compatibleCachedQuestions,FOCUS_VERSION,validateQuestionCoverage} from '../lib/focus.js';
+import {validateFocus,focusSignature,nextAssignments,compatibleCachedQuestions,FOCUS_VERSION,validateQuestionCoverage,FOCUS_V2} from '../lib/focus.js';
 import {cleanQuestions} from '../lib/assessment.js';
 import {buildReport} from '../lib/candidate.js';
 const approved={roleTitle:'Commercial Searcher',seniority:'Mid',experience:'2–5 years',summary:'Commercial title search',requirements:[
@@ -50,7 +50,7 @@ test('V2 evidence report groups all questions, shows profile and keeps full answ
   questionMap:{order:questions.map(q=>q.id),options:Object.fromEntries(questions.map(q=>[q.id,[0,1,2,3]]))},
   answers,questionMs:{},startedAt:at,deadlineAt:at+30*60000,currentIndex:19,activeSince:at+240000,isForeground:true,
   durationMinutes:30,integrityEvents:[{type:'tab_hidden',at:at+10000,questionIndex:0},{type:'tab_visible',at:at+15000,questionIndex:0}]};
- const report=buildReport(assignment,{title:approved.roleTitle,approvedRequirements:approved},{questions,focus:plan,version:1,questionVersion:FOCUS_VERSION},at+300000);
+ const report=buildReport(assignment,{title:approved.roleTitle,approvedRequirements:approved},{questions,focus:plan,version:1,questionVersion:FOCUS_V2},at+300000);
  assert.equal(report.reportVersion,2);assert.equal(report.competencies.length,4);
  assert.equal(report.score,40);assert.equal(report.correct,8);assert.equal(report.details.length,20);
  assert.equal(report.competencies[0].score,100);assert.equal(report.competencies[2].score,0);

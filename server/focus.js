@@ -13,7 +13,8 @@ async function propose(approved,targetCount){
   try{
     const response=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',signal:controller.signal,
       headers:{'Content-Type':'application/json',Authorization:`Bearer ${process.env.OPENAI_API_KEY}`},body:JSON.stringify({
-        model:process.env.OPENAI_QUESTION_MODEL||'gpt-4.1-mini',temperature:0.25,max_completion_tokens:1900,
+        model:process.env.OPENAI_FOCUS_MODEL||process.env.OPENAI_QUESTION_MODEL||'gpt-5.6-sol',
+        reasoning_effort:process.env.OPENAI_REASONING_EFFORT||'high',max_completion_tokens:4800,
         messages:[{role:'system',content:SYSTEM},{role:'user',content:JSON.stringify({
           roleTitle:approved.roleTitle,seniority:approved.seniority,summary:approved.summary,targetCount,
           exactGroupCount:config.groups,eligibleRequirements:allowed.map(index=>({index,...approved.requirements[index]})),

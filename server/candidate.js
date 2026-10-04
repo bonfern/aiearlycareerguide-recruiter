@@ -65,7 +65,8 @@ export default async function handler(req,res){
       if(action==='event'){
         const type=String(req.body.type||'');if(!EVENT_TYPES.has(type))throw requestFailure('Unsupported browser event',400);
         const events=d.integrityEvents||[];
-        if(events.length<MAX_EVENTS)changes.integrityEvents=[...events,{type,at,questionIndex:d.currentIndex||0}];
+        if(events.length<MAX_EVENTS)changes.integrityEvents=[...events,{type,at,questionIndex:d.currentIndex||0,
+          ...(type==='sustained_tab_change'?{durationSeconds:Math.max(10,Math.min(3600,Math.round(Number(req.body.durationSeconds)||0)))}:{})}];
         if(['tab_hidden','idle_start','offline'].includes(type)){
           changes.isForeground=false;changes.activeSince=null;
         }else if(['tab_visible','idle_end','online'].includes(type)){

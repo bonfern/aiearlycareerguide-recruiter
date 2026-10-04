@@ -1,49 +1,45 @@
-# AI Early Career Guide — Recruiter Assessment V2
+# AI Early Career Guide — Recruiter Assessment V3
 
-**This is the complete replacement of the standalone Recruiter website**, based on the previous Step 4.1 UI-fix release. It is **not** a replacement for the Student or Professional website. Its deployment remains on the independent `recruiter.aiearlycareerguide.com` Vercel project and Firebase database.
+**Independent Recruiter application** for `https://recruiter.aiearlycareerguide.com`. Student and Professional assessments remain in their existing repository and deployment.
 
-## What changed
+## INSTALL V3 — No local Node.js installation required
 
-- For **new assessments** only, question packages are **20 (30 min), 30 (45 min), 40 (60 min)**. Recruiters can still adjust time before inviting anyone.
-- After JD requirements are approved, click **Propose critical competencies with AI**. AI chooses the most important **4 / 5 / 6 groups** according to question count. The recruiter can edit group names, rationale, relative importance, approved JD requirement mappings and question allocation (minimum 3 per group) and must explicitly **Approve assessment focus** before creating the draft.
-- AI generates in batches of 6 and maps each question to one **approved focus group AND approved JD requirement**, rather than allocating questions across every JD requirement.
-- The independent organisation-scoped **V2 cache** reuses recruiter-approved question templates only when the exact focus matches, or conservatively reuses compatible questions from comparable roles (up to 60% for similar roles). Existing V1 question templates cannot accidentally pollute V2 assessments. Existing exact-JD extraction caching is unchanged.
-- The **V2 report** begins with the candidate assessment profile, grouped competency performance, test coverage descriptions, role-relevant interview validation ideas, independently verified eligibility criteria, uncovered critical JD requirements, grouped browser activity and question timing. All options, answers, correct answers, explanations and individual timings remain in a compact appendix.
-- A one-time optional OpenAI narrative edit occurs when a V2 recruiter report is first viewed; the narrative is cached in Firestore. Hard scores always come from the saved answer key, **never** the AI narrative. If OpenAI is unavailable, the rule-based factual profile remains available.
-- Older **15/25/40-question assessments, invitations, responses and reports remain untouched**. Reopening one renders the older display and generation workflow for that existing assessment. To try V2 with a previously used JD, create a **new Job**, paste that JD and run the new focus approval flow.
-- Official branding, responsive layout, collapsible sections, the server-enforced candidate timer, question navigation, OTP, browser monitoring and the pilot invitation limit of **five per JD** remain.
+1. Download and extract the complete V3 ZIP.
+2. Open the **Recruiter GitHub repository**, not the Student/Professional repository. Upload the ZIP's **contents** into the repository root, replacing earlier versions of files. Include `server`, `lib`, `assets`, `docs`, `tests` and the hidden `.github` directory. Do not create a second nested `recruiter-assessment-v3` directory in GitHub.
+3. **Important:** delete any old `.js` files in `api` except `router.js`. The V3 ZIP contains only **one deployable Vercel function**, `api/router.js`; the separate endpoint handlers reside in `server/` and do not count as Vercel functions.
+4. In the **Recruiter Vercel project → Settings → Environment Variables**, retain your existing Firebase, Resend and pilot-mode variables. Ensure `OPENAI_API_KEY` is configured. Add or update:
+   - `OPENAI_QUESTION_MODEL` = `gpt-5.6-sol` (only if your API project has access).
+   - `OPENAI_REASONING_EFFORT` = `high`.
+   - Optionally `OPENAI_FOCUS_MODEL` = `gpt-5.6-sol` (otherwise uses the question model).
+   The code defaults to these values even if the optional model/effort variables are absent. **OpenAI API billing is separate from ChatGPT subscriptions.** If your API project lacks model access, select a reasoning-capable model that your project supports and set `OPENAI_QUESTION_MODEL` accordingly.
+5. Commit the repository changes. Wait for **Vercel → Deployments → Ready**; there are no Firebase migrations or DNS changes.
+6. Create a **NEW TEST JD**. Previous published assessments remain locked and continue to use their original question and reporting versions.
+7. Approve the JD requirements, propose critical competencies, review/approve the 20-, 30- or 40-question focus, and create an assessment draft.
+8. Select **Generate questions**. The first call plans distinct topics for the whole assessment; later calls generate four questions per batch. The browser keeps calling the API and displays progress. If generation pauses, click **Continue generation**; already saved batches are retained.
+9. **Review all questions and their four alternatives before publishing.** The system checks for repeated topics and obvious distractors and will automatically retry a quality-rejected batch up to twice. It cannot prove every answer is unambiguous or every question is challenging. A recruiter must review the content and scoring rationale. Correct any flagged questions, save and publish.
+10. Send a pilot invitation, complete the timed candidate test and open the report. For a clean PDF, click **Print / Save PDF**, set destination to PDF, and **turn off the browser's “Headers and footers” option** so the browser itself does not add a URL or timestamp above your logo.
 
-## Install — no Node.js needed on your computer
+### What changes in V3
 
-1. Download the `recruiter-assessment-v2.zip` file and extract it on your computer.
-2. Open your **Recruiter GitHub repository only** (not the Student/Professional repository). Upload the ZIP's **contents to the repository root**, preserving the `api`, `server`, `lib`, `assets`, `tests` and `.github` folders. Replace the corresponding old files and commit to `main`.
-3. Check that the **`api` folder contains only `router.js`**. This is essential for Vercel Hobby's 12-function deployment limit; the other handlers stay in `server`, not `api`.
-4. Open Vercel → your **Recruiter project** → Deployments and wait for the new GitHub deployment to say **Ready**. No new environment variables or Firebase rules are required: the project reuses the **existing Recruiter** `OPENAI_API_KEY`, Firebase settings and Resend settings.
-5. Open `https://recruiter.aiearlycareerguide.com` and sign in. Create a **new test job** (or use a job whose requirements are approved and that does not yet have an assessment). Select **20 questions**, propose the critical competencies, check/edit them and their counts, approve, create the draft, generate the questions, review/edit, save and publish.
-6. Invite a test candidate and complete the assessment. Check the new report's **grouped competency scores, summary and compact detailed appendix**. Test Print → Save as PDF. Your original published assessment and report should remain accessible unchanged.
+- **Assessment blueprint** plans distinct subjects, scenarios, decisions and difficulty across the **entire** assessment before writing individual questions. Generation tests the most critical recruiter-approved competencies, not every JD line. Twenty questions is the minimum.
+- **Higher-reasoning question generation**, in small, recoverable batches, asks for four realistic alternatives and defends one preferred answer. A deterministic quality gate checks repeated topics, overlapping questions, common incompetent distractors and some common competency-mapping errors. Final publication runs quality checks again.
+- **Organisation-specific cache** reuses a complete approved topic plan for an identical role and up to **35%** of published questions only when their exact approved topics match; unrelated roles or other recruiters' content cannot be reused. Questions generated under V2 are **not imported into the V3 cache**.
+- **V3 candidate report** starts with the official logo, candidate and role, then score, attempted questions, time, factual response summary, grouped competency scores, strengths/gaps tied to question numbers, expanded interview validation, a short browser summary and a collapsible full question-by-question appendix.
+- **No claims about untested abilities**: correct selections in a leadership or communication scenario are reported as correct selections, not as evidence of actual communication delivery, employment history or software expertise. The report does not show the old untested-criteria tables or “broader coverage” jargon.
+- **Integrity**: brief focus changes and network delays are not flagged. The browser reports only a completed **10-second-or-longer hidden-tab episode**. There is no webcam. Browser activity is never a cheating verdict.
+- **Processing feedback**: recruiter requests show a clear, accessible working message; candidate OTP verification, navigation and submission show processing; answer saves remain visible inline. Screen updates preserve navigation and position from V2.
+- **Branding**: reuses the official logo and icon already present in the latest Recruiter files. Sentence-case screen labels, consistent product naming, navy and teal theme, print-specific report layout.
 
-### Important constraints
+### Architecture and version preservation
 
-- **Existing published assessments are immutable.** V2 does not migrate or silently overwrite them. New `questionVersion` values distinguish old and new report generation.
-- The recruiter approves the focus and every answer key. MCQs cannot verify employment experience or prove cheating. The browser log is only a set of observations, not a misconduct verdict.
-- The pilot remains limited to five candidate invitations per JD, without paid credits. Razorpay packages and coupons are **the next phase** and are **not** part of this release.
-- A V2 focus proposal and report narrative each use OpenAI when needed. Repeated viewing of a successfully generated report will reuse its saved summary rather than generate it again. Candidate answers and reports are never put into the question cache.
-- `OPENAI_QUESTION_MODEL` and `OPENAI_REPORT_MODEL` may optionally be configured to override the default question/narrative model. Existing `OPENAI_API_KEY` is sufficient for testing.
-- Don't upload `.env.local`, service-account JSON files or keys to GitHub.
+`api/router.js` is the **only** JavaScript file in `api/`. Vercel rewrites map existing `/api/*` URLs to that one router; handlers remain in `server/`. Firebase collections and environment variables are unchanged. Existing V1/V2 question sets, published assessment IDs and historical reports stay in place. New assessments are identified internally as `critical-competencies-v3`; V2 assessment drafts can still be finished on their legacy generator, while newly created JDs use V3.
 
-## Automated tests
+**Pilot mode still limits each JD to five invited candidates.** Prepaid credits, coupons and Razorpay are deliberately not part of this V3 quality update.
 
-GitHub Actions runs `npm test` and JavaScript syntax checks after each push. The updated suite includes focus selection, group quotas, organisation-isolated V2 caching, eligibility separation, report grouping and legacy compatibility. Browser simulations covered the V2 recruiter focus → draft journey, V2 report and the existing candidate navigation. These are not substitutes for live OpenAI/Resend/Firebase deployment tests.
+### Security
 
-## Directory map
+Never upload `.env.local`, service-account JSON, API keys, candidate tokens or real candidate data to GitHub. Verify your Vercel production deployment uses the intended Recruiter Firebase project only. If you added temporary GitHub secrets for the owner-seed action, remove them when no longer needed.
 
-- `api/router.js` — **only** deployable Vercel API function; maps clean URLs to `server/*` handlers.
-- `server/focus.js` — AI focus proposal and recruiter validation.
-- `lib/focus.js` — deterministic, versioned focus validation, allocation, signature and compatible question reuse.
-- `server/generate-questions.js` — V2 focus-aware AI questions with incremental progress and cached-question reuse.
-- `lib/candidate.js` — deterministic grouped evidence reporting and legacy V1 report compatibility.
-- `server/_profile.js` — optional one-time AI editorial summary from recorded results (not scoring).
-- `app.js`, `index.html`, `style.css` — recruiter dashboard, competency editor, report UI and print layout.
-- `candidate.js`, `candidate.html` — unchanged secure, timed candidate journey.
+### Testing
 
-See also: `docs/ASSESSMENT-V2.md`.
+The repository includes 48 automated JavaScript tests, run automatically via the existing GitHub Actions workflow; it needs no local Node.js install. A green Actions run is necessary but **not sufficient**: live OpenAI model availability, real email OTP delivery, actual question quality across different JDs, report accuracy against candidate responses, and Vercel latency still require an end-to-end pilot in your deployment.

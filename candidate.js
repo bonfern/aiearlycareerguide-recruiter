@@ -14,10 +14,17 @@ function clearMessage(){hide('candidate-message');}
 async function send(url,body,authenticated=false,{keepalive=false}={}){
   const headers={'Content-Type':'application/json'};
   if(authenticated){if(!session)throw new Error('Verify your email again.');headers.Authorization=`Bearer ${session}`;}
-  const response=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),cache:'no-store',keepalive});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(data.error||'Request failed. Check your internet connection.');
-  return data;
+  const action=body?.action;
+  const stage={"send-code":'Sending verification code…',verify:'Verifying your email…',start:'Preparing your timed assessment…',
+    navigate:'Opening question…',submit:'Submitting your answers…'}[action];
+  if(stage){const status=byId('candidate-processing-status');status.textContent=stage;status.classList.remove('hidden');}
+  try{
+    const response=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),cache:'no-store',keepalive});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||'Request failed. Check your internet connection.');
+    return data;
+  }finally{if(stage)byId('candidate-processing-status').classList.add('hidden');}
+
 }
 const inviteApi=(action,extra={})=>send('/api/invite',{invite,action,...extra});
 const candidateApi=(action,extra={})=>send('/api/candidate',{action,...extra},true);
@@ -187,7 +194,7 @@ byId('focus-toggle').addEventListener('click',()=>{
 async function flushEvents(){
   if(flushing||!session||!model||model.status!=='started')return;
   flushing=true;try{while(events.length){
-    const type=events[0];try{const result=await candidateApi('event',{type});events.shift();
+    const event=events[0];try{const result=await candidateApi('event',typeof event==='string'?{type:event}:event);events.shift();
       if(result.assessment.status==='completed'){showDone(result.assessment.finishReason);break;}}
     catch{break;}
   }}finally{flushing=false;}
@@ -199,9 +206,17 @@ function scheduleIdle(){if(idleTimeout)clearTimeout(idleTimeout);idleTimeout=set
 },90000);}
 for(const name of ['pointerdown','keydown'])document.addEventListener(name,()=>{
   if(model?.status!=='started')return;if(idle){idle=false;queueEvent('idle_end');}scheduleIdle();},{passive:true});
-document.addEventListener('visibilitychange',()=>queueEvent(document.hidden?'tab_hidden':'tab_visible'));
-window.addEventListener('blur',()=>queueEvent('window_blur'));
-window.addEventListener('focus',()=>{queueEvent('window_focus');flushEvents();});
+// V3: do not report window blur, server latency or momentary tab changes as integrity concerns.
+// Measure a sustained visibility change in the browser and send one completed episode.
+let hiddenAt=null;
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){if(model?.status==='started')hiddenAt=Date.now();return;}
+  if(hiddenAt!==null){const durationSeconds=Math.floor((Date.now()-hiddenAt)/1000);hiddenAt=null;
+    if(durationSeconds>=10)queueEvent({type:'sustained_tab_change',durationSeconds});
+  }
+  flushEvents();
+});
+window.addEventListener('focus',()=>flushEvents());
 document.addEventListener('copy',()=>queueEvent('copy'));
 document.addEventListener('paste',()=>queueEvent('paste'));
 window.addEventListener('offline',()=>queueEvent('offline'));

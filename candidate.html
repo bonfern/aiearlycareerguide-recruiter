@@ -9,6 +9,7 @@
 <header class="site-header"><div class="brand"><img class="brand-logo" src="/assets/brand-logo.png" alt="AI Early Career Guide — Explore Today. Brighter Tomorrows." /><span class="brand-product">Secure Candidate Assessment</span></div><span class="tag">Private invitation</span></header>
 <main class="candidate-main">
   <div id="candidate-message" class="message hidden" role="alert"></div>
+  <div id="candidate-processing-status" class="processing-pill hidden" role="status" aria-live="polite">Processing…</div>
   <section id="candidate-loading" class="card narrow"><h1>Loading your invitation…</h1><p class="muted">Please wait.</p></section>
   <section id="candidate-verify" class="card narrow hidden">
     <p class="eyebrow">STEP 1 · EMAIL VERIFICATION</p><h1>Your assessment</h1>
@@ -25,7 +26,7 @@
     <ul class="instruction-list"><li>One overall timer starts when you select Start. It cannot be paused, even if you disconnect.</li>
       <li>You can go back, change answers and move between questions before time runs out.</li>
       <li>Answers are saved to the server as you select them. The assessment submits automatically when time expires.</li>
-      <li>With your acknowledgement, we record tab changes, window focus, copy/paste and inactivity indicators. We do not access your camera or microphone.</li>
+      <li>With your acknowledgement, we record sustained tab changes, copy/paste and inactivity indicators. We do not access your camera or microphone.</li>
       <li>Browser events may have innocent explanations; the recruiter reviews them separately from your competency results.</li></ul>
     <label class="consent"><input id="candidate-consent" type="checkbox"> I understand the timed assessment and browser activity logging and will complete it independently.</label>
     <button type="button" id="begin-assessment" disabled>Start assessment</button>
