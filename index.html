@@ -81,7 +81,24 @@
           <div class="actions"><button id="approve-btn" type="submit">Approve requirements</button></div>
         </form>
       </div>
-      <div id="approved-box" class="hidden"><p class="success">Requirements approved and saved. The next phase will generate your editable candidate assessment from these requirements.</p><div id="approved-list"></div></div>
+      <div id="approved-box" class="hidden"><p class="success">Requirements approved. Generate and review a role-specific choice-based assessment below.</p><div id="approved-list"></div></div>
+      <section id="assessment-box" class="hidden assessment-section">
+        <div class="section-head"><div><p class="eyebrow">STEP 3 · ASSESSMENT</p><h2>Choice-based assessment</h2></div><span class="tag" id="assessment-status">Not started</span></div>
+        <div id="assessment-setup">
+          <p class="muted">Generate a recruiter-reviewed question bank for this JD. Similar approved roles may reduce AI generation costs.</p>
+          <label for="question-count">Assessment length</label>
+          <select id="question-count"><option value="15">Short — 15 questions</option><option value="25" selected>Standard — 25 questions</option><option value="40">Detailed — 40 questions</option></select>
+          <div class="actions"><button type="button" id="start-assessment-btn">Create assessment draft</button></div>
+        </div>
+        <div id="assessment-workspace" class="hidden">
+          <div id="generation-info" class="callout"></div>
+          <div class="actions" id="generation-controls"><button type="button" id="generate-btn">Generate remaining questions</button></div>
+          <p class="muted">Review all questions and the marked best answer. You can edit the wording, choices, answer and explanation before publishing. Questions and answer keys are for recruiters only.</p>
+          <div id="questions-list"></div>
+          <div id="assessment-actions" class="actions hidden"><button type="button" id="save-questions-btn" class="secondary">Save edited questions</button><button type="button" id="publish-btn">Publish assessment</button></div>
+          <p class="muted fine">After publishing, questions are locked. Candidate invitations and credit-based payments come in the next build step.</p>
+        </div>
+      </section>
     </section>
   </main>
   <footer>© AI Early Career Guide · Recruiter Assessment (independent application)</footer>

@@ -18,3 +18,17 @@ select:focus{outline:3px solid #dce9ff;border-color:#3774d7}
 .success{background:#ecfbf4;border:1px solid #a1dec3;padding:17px;color:#125338;border-radius:9px}
 #upload-status{margin:7px 0 0}
 @media(max-width:700px){.two-col{grid-template-columns:1fr}.actions{flex-wrap:wrap}.actions button{flex:1}}
+
+/* STEP 3: editable recruiter-only assessment */
+.assessment-section{border-top:1px solid #e5eaf1;margin-top:29px;padding-top:28px}
+.assessment-section .section-head{align-items:center}
+.question-card{padding:19px;border:1px solid #e1e8f2;border-radius:11px;margin:19px 0;background:#fbfcff}
+.question-card h3{font-size:15px;margin:0 0 9px;color:#233b63}
+.question-card textarea{margin:6px 0 10px}
+.question-card .two-col{margin:10px 0}
+.question-card .options-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.question-card .options-grid label{font-weight:600;margin:6px 0 4px}
+.question-card .fine{margin:9px 0 4px}
+.question-card .tag{margin-left:8px}
+.assessment-section .muted{margin:12px 0}
+@media(max-width:700px){.question-card .options-grid{grid-template-columns:1fr}.assessment-section .section-head{align-items:flex-start}}

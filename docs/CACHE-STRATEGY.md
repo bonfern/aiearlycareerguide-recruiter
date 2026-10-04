@@ -12,3 +12,7 @@
 **No candidate personal data** in any cache. Do not share one organization’s JD, templates or embeddings with another organization. Extracted JD text can contain confidential employer material: encrypt/lock down Admin access, limit retention, and show privacy terms before onboarding external recruiters.
 
 **Billing**: This phase does not debit candidate assessment credits (payment and candidate invitations are not implemented yet). Separate rate/budget limits at OpenAI project level provide cost protection during testing.
+
+## Step 3: approved question cache
+
+A recruiter must publish a verified assessment before questions enter `published_question_templates`. Exact approved requirement signatures (organisation ID, role, seniority, experience, all requirement text/categories/priorities) reuse complete sets if they contain the desired number of questions. Similar-role reuse requires matched title/seniority and bidirectional must-have requirement coverage and is capped at 60%. Mapping is requirement-by-requirement; all reused questions are reviewed in the editor before publishing. Per-candidate information is never written to the role cache. This is conservative token overlap, not an embedding/vector store.

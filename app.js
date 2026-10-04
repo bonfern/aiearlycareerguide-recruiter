@@ -9,6 +9,10 @@ let auth;
 let jobs = [];
 let currentJob = null;
 let workingRequirements = [];
+let currentAssessment = null;
+let workingQuestions = [];
+let savedSnapshot = "";
+let generating = false;
 
 function notify(text, error = false) {
   const box = byId('message'); box.textContent = text; box.classList.toggle('error', error);
@@ -75,14 +79,15 @@ function renderApproved(approved) {
 }
 async function openJob(id) {
   clearNotification(); onlyView('job-panel');
-  hide('extraction-box'); hide('approved-box'); show('extract-actions');
+  hide('extraction-box'); hide('approved-box'); hide('assessment-box'); show('extract-actions');
+  currentAssessment = null; workingQuestions = [];
   byId('extract-btn').disabled = true;
   try {
     currentJob = (await api(`/api/job?id=${encodeURIComponent(id)}`)).job;
     byId('detail-title').textContent = currentJob.title;
     byId('detail-status').textContent = `Status: ${currentJob.status.replaceAll('_',' ')}`;
     byId('detail-jd').textContent = currentJob.jdText;
-    if (currentJob.approvedRequirements) renderApproved(currentJob.approvedRequirements);
+    if (currentJob.approvedRequirements) { renderApproved(currentJob.approvedRequirements); await loadAssessment(); }
     else if (currentJob.extraction) {hide('extract-actions'); renderExtraction(currentJob.extraction, currentJob.extractionSource);}
     else show('extract-actions');
   } catch(error) {notify(error.message, true);}
@@ -204,10 +209,131 @@ byId('requirements-form').addEventListener('submit', async event => {
     const result = await api('/api/requirements', {method:'POST', body: JSON.stringify({jobId: currentJob.id, approved})});
     currentJob.approvedRequirements = result.approvedRequirements;
     renderApproved(result.approvedRequirements);
-    notify('Requirements approved. This version is locked and ready for assessment generation in the next phase.');
+    await loadAssessment();
+    notify('Requirements approved. Select the assessment length to generate your questions.');
   } catch(error) {notify(error.message, true);}
   finally {button.disabled = false;}
 });
+
+// Recruiter-only question editor. Never render generated answer keys in a candidate-facing route.
+const qTypes = ['Knowledge','Situational judgement','Problem solving','Leadership','Stakeholder management'];
+const qEl = (name, value, rows = 0, maxLength = 260) => {
+  const element = document.createElement(rows ? 'textarea' : 'input');
+  if(rows) element.rows = rows;
+  element.maxLength = maxLength;
+  element.value = value ?? '';
+  element.setAttribute('aria-label', name);
+  return element;
+};
+function selectField(values, selected, label, changed) {
+  const s = document.createElement('select'); s.setAttribute('aria-label', label);
+  values.forEach(v => s.append(makeOption(v, selected)));
+  s.addEventListener('change',() => changed(s.value));
+  return s;
+}
+function markChanged() {byId('publish-btn').disabled = true; byId('publish-btn').title='Save your edits before publishing';}
+function drawQuestions() {
+  const container=byId('questions-list'); container.replaceChildren();
+  if(workingQuestions.length!==currentAssessment.targetCount) return;
+  const published=currentAssessment.status==='published';
+  workingQuestions.forEach((q,i)=>{
+    const card=document.createElement('div'); card.className='question-card';
+    const heading=document.createElement('h3'); heading.textContent=`Question ${i+1}`;
+    const tag=document.createElement('span');tag.className='tag';tag.textContent=q.source==='exact-cache'?'Exact cache':q.source==='similar-cache'?'Similar role':'New';
+    heading.append(tag);card.append(heading);
+    const prompt=qEl(`Question ${i+1}`,q.text,3,650);prompt.disabled=published;
+    prompt.addEventListener('input',()=>{q.text=prompt.value;markChanged();});card.append(prompt);
+    const meta=document.createElement('div');meta.className='two-col';
+    const requirement=document.createElement('div');const reqLabel=document.createElement('label');reqLabel.textContent='Mapped JD requirement';
+    const reqOptions=currentJob.approvedRequirements.requirements.map((r,index)=>`${index+1}. ${r.text}`);
+    const reqSelect=selectField(reqOptions,reqOptions[q.requirementIndex],`Requirement for question ${i+1}`,value=>{
+      q.requirementIndex=reqOptions.indexOf(value);markChanged();});reqSelect.disabled=published;requirement.append(reqLabel,reqSelect);
+    const typeBox=document.createElement('div');const typeLabel=document.createElement('label');typeLabel.textContent='Question type';
+    const typeSelect=selectField(qTypes,q.type,`Question type ${i+1}`,value=>{q.type=value;markChanged();});typeSelect.disabled=published;typeBox.append(typeLabel,typeSelect);meta.append(requirement,typeBox);card.append(meta);
+    const grid=document.createElement('div');grid.className='options-grid';
+    q.options.forEach((opt,j)=>{
+      const cell=document.createElement('div');const label=document.createElement('label');label.textContent=`Option ${'ABCD'[j]}`;
+      const input=qEl(`Question ${i+1}, option ${'ABCD'[j]}`,opt,2,260);input.disabled=published;
+      input.addEventListener('input',()=>{q.options[j]=input.value;markChanged();});cell.append(label,input);grid.append(cell);
+    });card.append(grid);
+    const answer=document.createElement('label');answer.textContent='Best answer';card.append(answer);
+    const answerSelect=selectField(['A','B','C','D'],'ABCD'[q.correctIndex],`Best answer for question ${i+1}`,value=>{q.correctIndex='ABCD'.indexOf(value);markChanged();});
+    answerSelect.disabled=published;card.append(answerSelect);
+    const why=document.createElement('label');why.textContent='Why this is the best answer (recruiter only)';card.append(why);
+    const rationale=qEl(`Explanation for question ${i+1}`,q.rationale,3,700);rationale.disabled=published;
+    rationale.addEventListener('input',()=>{q.rationale=rationale.value;markChanged();});card.append(rationale);
+    container.append(card);
+  });
+  if(!published) show('assessment-actions');
+}
+function assessmentDisplay() {
+  if(!currentAssessment) {show('assessment-setup');hide('assessment-workspace');byId('assessment-status').textContent='Not started';return;}
+  hide('assessment-setup');show('assessment-workspace');
+  const a=currentAssessment;
+  byId('assessment-status').textContent=a.status;
+  byId('generation-info').textContent=`${workingQuestions.length} of ${a.targetCount} questions prepared. ${a.reusedCount||0} reused from your organisation’s published question cache.${a.status==='published'?' Assessment published and locked.':''}`;
+  if(a.status==='published') {hide('generation-controls');hide('assessment-actions');drawQuestions();return;}
+  if(workingQuestions.length<a.targetCount) {
+    show('generation-controls');hide('assessment-actions');
+    const btn=byId('generate-btn');btn.disabled=generating;btn.textContent=generating?'Generating questions…':workingQuestions.length?'Continue generation':'Generate questions';
+    byId('questions-list').replaceChildren();
+    return;
+  }
+  hide('generation-controls');drawQuestions();
+  byId('publish-btn').disabled=JSON.stringify(workingQuestions)!==savedSnapshot;
+}
+async function loadAssessment() {
+  show('assessment-box');
+  const result=await api(`/api/assessment?jobId=${encodeURIComponent(currentJob.id)}`);
+  currentAssessment=result.assessment;
+  workingQuestions=(currentAssessment?.questions||[]).map(q=>({...q,options:[...q.options]}));
+  savedSnapshot=JSON.stringify(workingQuestions);
+  assessmentDisplay();
+}
+byId('start-assessment-btn').addEventListener('click',async()=>{
+  if(!currentJob?.approvedRequirements)return;
+  clearNotification();const btn=byId('start-assessment-btn');btn.disabled=true;
+  try{
+    const result=await api('/api/assessment',{method:'POST',body:JSON.stringify({action:'start',jobId:currentJob.id,targetCount:Number(byId('question-count').value)})});
+    currentAssessment=result.assessment;workingQuestions=(result.assessment.questions||[]).map(q=>({...q,options:[...q.options]}));
+    savedSnapshot=JSON.stringify(workingQuestions);assessmentDisplay();
+    notify('Assessment draft created. Select Generate questions to begin.');
+  }catch(error){notify(error.message,true);}finally{btn.disabled=false;}
+});
+byId('generate-btn').addEventListener('click',async()=>{
+  if(generating||!currentAssessment)return;
+  generating=true;clearNotification();assessmentDisplay();
+  try{
+    while(workingQuestions.length<currentAssessment.targetCount){
+      const result=await api('/api/generate-questions',{method:'POST',body:JSON.stringify({jobId:currentJob.id})});
+      workingQuestions=result.questions.map(q=>({...q,options:[...q.options]}));
+      currentAssessment.questions=result.questions;currentAssessment.reusedCount=result.reusedCount;
+      savedSnapshot=JSON.stringify(workingQuestions);assessmentDisplay();
+      if(result.done)break;
+    }
+    notify('Assessment questions are ready. Review and save any edits before publishing.');
+  }catch(error){notify(`Generation paused: ${error.message} You can continue without losing completed batches.`,true);}
+  finally{generating=false;assessmentDisplay();}
+});
+byId('save-questions-btn').addEventListener('click',async()=>{
+  clearNotification();const btn=byId('save-questions-btn');btn.disabled=true;
+  try{
+    const result=await api('/api/assessment',{method:'POST',body:JSON.stringify({action:'save',jobId:currentJob.id,questions:workingQuestions})});
+    workingQuestions=result.assessment.questions.map(q=>({...q,options:[...q.options]}));
+    savedSnapshot=JSON.stringify(workingQuestions);assessmentDisplay();notify('Edits saved. You may now publish.');
+  }catch(error){notify(error.message,true);}finally{btn.disabled=false;}
+});
+byId('publish-btn').addEventListener('click',async()=>{
+  if(!currentAssessment || currentAssessment.status!=='draft')return;
+  if(JSON.stringify(workingQuestions)!==savedSnapshot)return notify('Save your edits before publishing.',true);
+  if(!window.confirm('Publish and lock this assessment? You cannot edit it after publishing.'))return;
+  clearNotification();const btn=byId('publish-btn');btn.disabled=true;
+  try{
+    await api('/api/assessment',{method:'POST',body:JSON.stringify({action:'publish',jobId:currentJob.id})});
+    await loadAssessment();notify('Assessment published. Approved questions are now eligible for reuse in similar roles. Candidate invitations come in Step 4.');
+  }catch(error){notify(error.message,true);btn.disabled=false;}
+});
+
 try {
   const response = await fetch('/api/public-config'); const config = await response.json();
   if (!response.ok) throw new Error(config.error || 'Firebase configuration unavailable');

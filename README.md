@@ -1,34 +1,42 @@
-# AI Early Career Guide — Recruiter Assessment | Step 2
+# AI Early Career Guide — Recruiter Assessment | Step 3
 
-Independent recruiter application. Keep the existing Student and Professional apps untouched. Step 2 adds authenticated JD upload/paste, OpenAI requirement extraction, organisation-scoped exact-JD caching, organisation-scoped suggestions of similar *previously recruiter-approved* roles, recruiter editing and approval.
+Independent recruiter application. Do **not** edit the existing Student / Professional repository, Firebase project or Vercel project. Step 3 adds question generation, strict organisation-scoped reuse of previously published recruiter-approved questions, a review/edit screen and assessment publishing. Existing Step 1/2 JDs and approved requirements remain usable.
 
-**Not yet implemented:** choice-based question generation, full approved-question reuse, candidate invitations, OTP, evidence reports, and paid credits/coupons. These follow in later phases. Similar-role suggestions here are *not* automatic extraction reuse; they become inputs to controlled question-template reuse during assessment generation.
+## Deploy Step 3 — no local Node.js needed
 
-## Deploy this update without installing Node.js
+1. Extract **recruiter-assessment-step3.zip**. In your *recruiter-only* GitHub repository, upload/replace the **contents** of the extracted folder, preserving `api/`, `lib/`, `tests/` and the other directories. Do not upload the outer folder as a nested directory. Commit changes to the branch connected to your recruiter Vercel project.
+2. In **Recruiter Vercel → Settings → Environment Variables**, confirm `OPENAI_API_KEY` is already present from Step 2. Your other Firebase variables remain unchanged. **No new mandatory variable** for Step 3. Optional: `OPENAI_QUESTION_MODEL=gpt-4.1-mini`.
+3. Go to **Recruiter Vercel → Deployments**, check the deployment for the new GitHub commit succeeded. Redeploy the latest commit if required. If Vercel warns that the function duration setting is unsupported on your plan, shorten `api/generate-questions.js` `BATCH` to 4 and set `maxDuration` in `vercel.json` to your plan's supported limit.
+4. Visit **https://recruiter.aiearlycareerguide.com**, sign in, and open a job whose requirements you already approved.
+5. Scroll to **Choice-based assessment**, select 15 (start with the shortest test), click **Create assessment draft**, and then click **Generate questions**. The interface builds the assessment in small AI batches and displays progress.
+6. Review all questions, edit a scenario or answer choice, change the best answer if needed, **Save edited questions**, and **Publish assessment**. Publishing locks the questions and stores the approved template for later reuse within your organisation.
+7. To test caching, create a **new JD** with the same title and requirements, approve its extraction, create another 15-question assessment and generate. An exact approved match should reuse all 15 without a new AI question-generation call. Similar roles at the same seniority with matching must-have requirements may reuse up to 60%; the remaining questions are generated specifically for the new JD. Reused questions must still be reviewed.
 
-1. Download and unzip `recruiter-assessment-step2.zip`. In your **recruiter-only GitHub repository**, replace existing files with the new full versions and add the new files. Keep the directory structure (e.g., `api/extract.js` remains under `api/`). Do not change the Student/Professional repository.
-2. Create an OpenAI **API key** in a separately configured API project at https://platform.openai.com/api-keys. Set a modest project spend limit and usage alerts. An existing ChatGPT subscription does not include API credits.
-3. In your **Recruiter Vercel project only**, go to **Settings → Environment Variables**. Add `OPENAI_API_KEY` (secret) with the new key. Optionally set `OPENAI_EXTRACTION_MODEL` to `gpt-4.1-mini` (default). Never enter an OpenAI key in website code or GitHub.
-4. Redeploy the recruiter project (ensure Vercel is building the new GitHub commit). The new `package.json` installs `mammoth` and `pdf-parse` in Vercel automatically; you don't need Node.js locally.
-5. Log in at https://recruiter.aiearlycareerguide.com. Open the previously created draft job, select **Extract requirements with AI**, edit a requirement or priority, and click **Approve requirements**. For upload testing, create another job using a machine-readable PDF/DOCX or TXT file up to 2 MB.
-6. For cache testing, create a new job with the **same title and identical JD text**, then extract. The screen should say **Cache hit** and no second OpenAI call is needed. A similar but not identical approved JD may show a suggested template; it will not blindly reuse it.
+**This step stops at publishing the recruiter assessment.** Candidate invitations, OTP, purchased credits/coupons, answer submission and evidence reports are not yet active. Do not send question-editor URLs to candidates.
 
-## Data collections
+## How this cache works
 
-- `recruiter_jobs`: JD, extraction, approval, and status for each role. Existing draft jobs remain compatible.
-- `jd_extraction_cache`: SHA256 of org ID + prompt version + JD fingerprint. Exact hits skip extraction API costs. Does not store candidate data.
-- `approved_role_templates`: reviewer-approved requirements stored per organization for future question-template reuse. For safety, comparison requires compatible seniority, role title and Must Have requirements.
+- Exact JD extraction cache from Step 2 is unchanged (`jd_extraction_cache`).
+- New collection `published_question_templates` contains only *recruiter-reviewed and published* question sets, with a signature that includes the organisation, role, seniority, experience and all approved requirements.
+- Exact approved match with sufficient questions: reuse the whole assessment. Similar approved role: require the same seniority and an 80%+ role-title overlap, matching all mandatory requirements in both directions; map each reused question to a matching approved requirement; cap reuse at 60%. The remaining questions are newly generated.
+- No candidate information is stored or reused in the cache. Cache lookups are limited to the currently authenticated recruiter's organisation. This is a conservative **keyword/requirements similarity cache**, not a semantic vector-search system; semantic matching may follow after testing its cost and accuracy.
+- OpenAI may also provide automatic prompt caching for repeated static instructions. Avoid changing the constant prompt wording on every request.
 
-All API endpoints require a Firebase ID token and membership in the organization. Direct client access to Firestore remains denied by `firestore.rules`. A recruiter cannot pass another organization's ID in the request to access its data.
+## Data model
 
-## Typical problems
+- `recruiter_assessments/{jobId}`: one assessment (V1) per JD, selected question count, draft generation progress, recruiter edits and final published questions. You cannot change the question count after starting, and published assessments cannot be modified. For a materially different JD or assessment, create a new job.
+- `published_question_templates`: organisation-scoped approved question-cache entries, created **only when the recruiter publishes**.
+- Existing `recruiter_jobs` status changes to `assessment_draft` and then `published`.
 
-- **OpenAI configuration missing**: Confirm `OPENAI_API_KEY` exists under the *recruiter* Vercel project and redeploy.
-- **Unauthorized**: Verify the recruiter Firebase login and your existing `recruiter_members` record.
-- **Scanned PDF**: Image-only PDFs aren't supported in this phase; paste the JD text or use a readable DOCX/PDF.
-- **File parsing error**: Keep uploads under 2 MB, and ensure that `package.json` has been replaced and deployed.
-- **Status already approved**: Approved requirements are locked for this phase. To assess a materially revised JD, create a new job; versioning follows in assessment-generation phase.
+All new endpoints use the same Firebase ID token and recruiter organisation membership checks. Firestore client access remains denied; only authorised backend endpoints read/write question keys. No changes to Firebase security rules or GitHub secrets are needed.
 
-## Internal checks
+## Checks and limitations
 
-`npm test` (executed by GitHub Actions if desired) verifies JD hashing, organization-scoped keys, extraction validation and guarded similarity suggestions. Never commit `.env.local` or service-account JSON to GitHub.
+`npm test` uses built-in Node.js tests for caching, role compatibility, organisation isolation, invalid questions and requirement coverage. Vercel installs Node.js and production packages automatically; none are required on your personal computer.
+
+- Only objective, **four-option, one-best-answer** screening questions in this version. AI-drafted answers and rationales are not authoritative: recruiters must verify accuracy and fairness before publishing.
+- Do not score or reject candidates automatically. Future reports should provide evidence and flag uncertainty for human judgement.
+- Generated batches are saved after every successful request; if a batch fails, press **Continue generation** instead of restarting or paying to regenerate completed batches.
+- The backend blocks concurrent generation with an expiring lock. Large AI batches and downstream API issues can occasionally require retrying.
+- The initial cache scans up to 100 templates within an organisation; larger organisations will need indexed search/pagination.
+- No site secrets belong in GitHub source code, browser HTML or screenshots.
