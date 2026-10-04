@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      // Browser may use Firebase Authentication only. All Firestore data is
+      // accessed by serverless endpoints after ID-token and org checks.
+      allow read, write: if false;
+    }
+  }
+}

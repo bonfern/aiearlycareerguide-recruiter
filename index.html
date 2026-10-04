@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="AI Early Career Guide - Recruiter Assessments" />
+  <title>Recruiter Assessments | AI Early Career Guide</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand"><span class="brand-mark">AI</span><span>AI EARLY CAREER GUIDE <small>Recruiter Assessments</small></span></div>
+    <button id="logout" class="secondary hidden" type="button">Sign out</button>
+  </header>
+  <main>
+    <div id="message" class="message hidden" role="status" aria-live="polite"></div>
+    <section id="login-panel" class="card narrow">
+      <p class="eyebrow">INDEPENDENT RECRUITER PORTAL</p>
+      <h1>Recruiter login</h1>
+      <p class="muted">Sign in using the account your administrator created for you.</p>
+      <form id="login-form">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required autocomplete="username" placeholder="name@company.com" />
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="current-password" />
+        <button type="submit" id="login-btn">Sign in</button>
+      </form>
+      <p class="muted fine">Recruiter registration is by invitation only.</p>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <div class="page-top">
+        <div><p class="eyebrow" id="org-name">RECRUITER WORKSPACE</p><h1>Jobs dashboard</h1><p class="muted">Create a JD once, then assess multiple candidates against it.</p></div>
+        <button type="button" id="new-job-btn">+ Create job</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><span>Total jobs</span><strong id="total-jobs">0</strong></div>
+        <div class="stat"><span>Published</span><strong id="published-jobs">0</strong></div>
+        <div class="stat"><span>Candidates</span><strong id="total-candidates">0</strong></div>
+        <div class="stat"><span>Completed</span><strong id="total-completed">0</strong></div>
+      </div>
+      <section class="card">
+        <div class="section-head"><h2>My jobs</h2><input type="search" id="search" placeholder="Search job title" aria-label="Search jobs" /></div>
+        <div class="table-wrap"><table><thead><tr><th>Job title</th><th>Status</th><th>Candidates</th><th>Completed</th><th>Created</th></tr></thead><tbody id="jobs-body"></tbody></table></div>
+        <p class="muted" id="empty-state">No jobs yet. Select “Create job” to begin.</p>
+      </section>
+    </section>
+
+    <section id="create-panel" class="card hidden">
+      <div class="section-head"><div><p class="eyebrow">STEP 1</p><h1>Create new job</h1></div><button id="back-btn" type="button" class="secondary">Back to dashboard</button></div>
+      <p class="muted">Start by pasting a JD. PDF and Word uploads and AI extraction arrive in the next build step.</p>
+      <form id="job-form">
+        <label for="job-title">Job title <span class="required">*</span></label>
+        <input id="job-title" maxlength="150" minlength="3" required placeholder="e.g. Senior Finance Analyst" />
+        <label for="department">Department (optional)</label>
+        <input id="department" maxlength="100" placeholder="e.g. Finance" />
+        <label for="jd-text">Job description <span class="required">*</span></label>
+        <textarea id="jd-text" required minlength="50" maxlength="30000" rows="13" placeholder="Paste the full job description here..."></textarea>
+        <div class="actions"><button type="submit" id="save-job-btn">Save draft JD</button><button id="cancel-btn" type="button" class="secondary">Cancel</button></div>
+      </form>
+    </section>
+  </main>
+  <footer>© AI Early Career Guide · Recruiter Assessment (independent application)</footer>
+</body>
+</html>
