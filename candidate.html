@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
+  <title>Secure Candidate Assessment | AI Early Career Guide</title>
+  <link rel="stylesheet" href="/style.css"><script type="module" src="/candidate.js"></script>
+</head>
+<body class="candidate-site">
+<header class="site-header"><div class="brand"><span class="brand-mark">AI</span><span>AI EARLY CAREER GUIDE<small>Secure Candidate Assessment</small></span></div><span class="tag">Private invitation</span></header>
+<main class="candidate-main">
+  <div id="candidate-message" class="message hidden" role="alert"></div>
+  <section id="candidate-loading" class="card narrow"><h1>Loading your invitation…</h1><p class="muted">Please wait.</p></section>
+  <section id="candidate-verify" class="card narrow hidden">
+    <p class="eyebrow">STEP 1 · EMAIL VERIFICATION</p><h1>Your assessment</h1>
+    <p class="muted" id="invite-details"></p>
+    <p>We will send a six-digit verification code to <strong id="email-hint"></strong>.</p>
+    <button id="request-otp" type="button">Email verification code</button>
+    <form id="otp-form" class="hidden"><label for="otp-input">Verification code</label><input id="otp-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" placeholder="6-digit code" />
+      <button type="submit" id="verify-otp">Verify my email</button></form>
+    <p class="muted fine">Your link is personal. Do not share your invitation or verification code.</p>
+  </section>
+  <section id="candidate-ready" class="card narrow hidden">
+    <p class="eyebrow">STEP 2 · BEFORE YOU START</p><h1>Assessment instructions</h1>
+    <p id="ready-description"></p>
+    <ul class="instruction-list"><li>One overall timer starts when you select Start. It cannot be paused, even if you disconnect.</li>
+      <li>You can go back, change answers and move between questions before time runs out.</li>
+      <li>Answers are saved to the server as you select them. The assessment submits automatically when time expires.</li>
+      <li>With your acknowledgement, we record tab changes, fullscreen exit, copy/paste and inactivity indicators. We do not access your camera or microphone.</li>
+      <li>Browser events may have innocent explanations; the recruiter reviews them separately from your competency results.</li></ul>
+    <label class="consent"><input id="candidate-consent" type="checkbox"> I understand the timed assessment and browser activity logging and will complete it independently.</label>
+    <label class="consent"><input id="fullscreen-opt-in" type="checkbox"> Attempt optional fullscreen mode (if your browser supports it).</label>
+    <button type="button" id="begin-assessment" disabled>Start assessment</button>
+    <p class="muted fine">You may complete the assessment without fullscreen. Choosing fullscreen does not prevent using another device.</p>
+  </section>
+  <section id="candidate-test" class="card hidden">
+    <div class="candidate-top"><div><p class="eyebrow">TIMED ASSESSMENT</p><h1 id="candidate-role">Assessment</h1><span id="candidate-progress" class="muted"></span></div>
+      <div class="timer-card"><small>TIME REMAINING</small><strong id="candidate-timer">—</strong></div></div>
+    <div id="candidate-question-nav" class="question-nav" aria-label="Go to question"></div>
+    <div class="question-card" id="candidate-question"><h2 id="candidate-question-title"></h2><p id="candidate-question-text"></p><fieldset id="candidate-options"></fieldset>
+      <p id="answer-save-status" class="muted fine" aria-live="polite">Your answers are saved as you select them.</p></div>
+    <div class="candidate-actions"><button id="candidate-prev" class="secondary" type="button">← Previous</button><button id="candidate-next" type="button">Next →</button><button id="candidate-submit" class="secondary" type="button">Finish and submit</button></div>
+    <p class="muted fine">Your countdown continues if you leave this page. Please finish before the deadline.</p>
+  </section>
+  <section id="candidate-done" class="card narrow hidden"><p class="eyebrow">ASSESSMENT RECEIVED</p><h1>Thank you</h1><p id="completion-message">Your assessment has been submitted. You may close this page.</p><p class="muted fine">Your individual evidence report is available only to the recruiter.</p></section>
+</main><footer>© AI Early Career Guide · Assessment integrity indicators are not proof of cheating</footer>
+</body></html>

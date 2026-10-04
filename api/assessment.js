@@ -1,5 +1,6 @@
 import {requireRecruiter, reject} from './_auth.js';
 import {assessmentSignature, cleanQuestions, SIZES, QUESTION_VERSION} from '../lib/assessment.js';
+import {durationFor,validDuration} from '../lib/candidate.js';
 
 const validId = id => typeof id === 'string' && /^[a-zA-Z0-9]{10,40}$/.test(id);
 const view = snap => snap.exists ? {id: snap.id, ...snap.data(), generationLock: undefined,
@@ -53,6 +54,18 @@ export default async function handler(req, res) {
       });
       return res.status(200).json(result);
     }
+    if (action === 'duration') {
+      const minutes=Number(req.body.durationMinutes);
+      if(!validDuration(minutes))return res.status(400).json({error:'Duration must be 10–120 minutes'});
+      await user.db.runTransaction(async tx=>{
+        const [job,snap]=await Promise.all([tx.get(jobRef),tx.get(ref)]);
+        if(!job.exists||job.data().orgId!==user.orgId||!snap.exists||snap.data().orgId!==user.orgId||snap.data().status!=='published')
+          throw Object.assign(new Error('Publish the assessment first'),{status:409});
+        if((job.data().candidateCount||0)>0)throw Object.assign(new Error('Cannot change duration after inviting candidates'),{status:409});
+        tx.update(ref,{durationMinutes:minutes,updatedAt:new Date()});
+      });
+      return res.status(200).json({durationMinutes:minutes});
+    }
     if (action === 'publish') {
       const result = await user.db.runTransaction(async tx => {
         const [job, assessment] = await Promise.all([tx.get(jobRef),tx.get(ref)]);
@@ -64,7 +77,8 @@ export default async function handler(req, res) {
         const signature = assessmentSignature(user.orgId,job.data().approvedRequirements);
         const cache = user.db.collection('published_question_templates').doc();
         const approved = job.data().approvedRequirements;
-        tx.update(ref,{status:'published',publishedAt:new Date(),updatedAt:new Date()});
+        const durationMinutes=durationFor(data);
+        tx.update(ref,{status:'published',durationMinutes,publishedAt:new Date(),updatedAt:new Date()});
         tx.update(jobRef,{status:'published',updatedAt:new Date()});
         tx.create(cache,{orgId:user.orgId,sourceJobId:jobId,signature,roleTitle:approved.roleTitle,seniority:approved.seniority,
           requirements:approved.requirements,questions,questionVersion:QUESTION_VERSION,createdAt:new Date()});

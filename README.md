@@ -1,42 +1,46 @@
-# AI Early Career Guide — Recruiter Assessment | Step 3
+# AI Early Career Guide — Recruiter Assessment | Step 4
 
-Independent recruiter application. Do **not** edit the existing Student / Professional repository, Firebase project or Vercel project. Step 3 adds question generation, strict organisation-scoped reuse of previously published recruiter-approved questions, a review/edit screen and assessment publishing. Existing Step 1/2 JDs and approved requirements remain usable.
+**Independent recruiter-only application.** Does not change either existing Student or Professional assessment. Step 4 adds secure candidate invitations, email OTP, timed exams with back navigation and server autosave, optional fullscreen, browser activity logs, a complete objective evidence report, and owner-controlled permanent deletion. Existing Steps 1–3 JDs, approved requirements and published questions remain usable.
 
-## Deploy Step 3 — no local Node.js needed
+## Deploy using GitHub + Vercel (NO local Node.js required)
 
-1. Extract **recruiter-assessment-step3.zip**. In your *recruiter-only* GitHub repository, upload/replace the **contents** of the extracted folder, preserving `api/`, `lib/`, `tests/` and the other directories. Do not upload the outer folder as a nested directory. Commit changes to the branch connected to your recruiter Vercel project.
-2. In **Recruiter Vercel → Settings → Environment Variables**, confirm `OPENAI_API_KEY` is already present from Step 2. Your other Firebase variables remain unchanged. **No new mandatory variable** for Step 3. Optional: `OPENAI_QUESTION_MODEL=gpt-4.1-mini`.
-3. Go to **Recruiter Vercel → Deployments**, check the deployment for the new GitHub commit succeeded. Redeploy the latest commit if required. If Vercel warns that the function duration setting is unsupported on your plan, shorten `api/generate-questions.js` `BATCH` to 4 and set `maxDuration` in `vercel.json` to your plan's supported limit.
-4. Visit **https://recruiter.aiearlycareerguide.com**, sign in, and open a job whose requirements you already approved.
-5. Scroll to **Choice-based assessment**, select 15 (start with the shortest test), click **Create assessment draft**, and then click **Generate questions**. The interface builds the assessment in small AI batches and displays progress.
-6. Review all questions, edit a scenario or answer choice, change the best answer if needed, **Save edited questions**, and **Publish assessment**. Publishing locks the questions and stores the approved template for later reuse within your organisation.
-7. To test caching, create a **new JD** with the same title and requirements, approve its extraction, create another 15-question assessment and generate. An exact approved match should reuse all 15 without a new AI question-generation call. Similar roles at the same seniority with matching must-have requirements may reuse up to 60%; the remaining questions are generated specifically for the new JD. Reused questions must still be reviewed.
+1. Extract `recruiter-assessment-step4.zip`. In your **recruiter-only GitHub repository**, upload the **contents** of the extracted folder into the repository root and replace the existing files (`index.html`, `app.js`, `style.css`, `api/`, `lib/`, etc.). Keep existing Firebase and Vercel projects and the existing Student / Professional repository unchanged. Do not upload an outer `recruiter-assessment-step4` folder.
+2. In **Vercel → Recruiter project → Settings → Environment Variables**, keep your existing Firebase and `OPENAI_API_KEY` settings. Add the five settings below for the **Recruiter Vercel project only**:
 
-**This step stops at publishing the recruiter assessment.** Candidate invitations, OTP, purchased credits/coupons, answer submission and evidence reports are not yet active. Do not send question-editor URLs to candidates.
+   | Variable | Value / where to obtain it |
+   | --- | --- |
+   | `RESEND_API_KEY` | API key from [Resend](https://resend.com/api-keys) with email-send permission. |
+   | `RECRUITER_FROM_EMAIL` | Verified sender on your Resend account, e.g. `AI Early Career Guide <assessments@aiearlycareerguide.com>` **ONLY once you have verified that sender's domain with Resend**. |
+   | `CANDIDATE_SESSION_SECRET` | A **new**, unique randomly generated 48+ character secret; never share it or commit it. Changing it invalidates current candidate sessions and encrypted invitation-link storage. |
+   | `RECRUITER_BASE_URL` | `https://recruiter.aiearlycareerguide.com` (without trailing slash). |
+   | `RECRUITER_PILOT_MODE` | `true` for your controlled, **maximum five active invitations per JD** trial. If absent or set to anything else, candidate creation is blocked until credits are implemented. |
 
-## How this cache works
+   You **must verify your sending domain inside the Resend account that owns the new API key**. Resend will show any required SPF/DKIM DNS records. Copy exactly those records; do not overwrite your existing site's A or CNAME records. If your existing Resend account has already verified the domain, use its verified sender. Treat all API keys and the session secret as private Vercel environment variables. Don't put them in GitHub secrets unless a future workflow explicitly needs them.
+3. Once GitHub triggers a successful Vercel build, go to `https://recruiter.aiearlycareerguide.com`. Existing login and JDs should be unchanged.
+4. Open a **published** assessment. Under **Candidates & evidence reports**, choose the duration (defaults: 15 questions/25 minutes, 25/40, 40/60; adjustable 10–120 minutes) and select **Save duration**. **Duration locks at the first invitation.** Published Step 3 assessments work without regenerating.
+5. Add your own **test candidate name and email** and click **Send secure invitation**. The invitation is sent automatically via Resend and a secure link appears for manual copying. If email delivery fails, fix the sender-domain configuration and use **Resend email**. The link alone does not permit entry; candidate must retrieve the email OTP.
+6. Open the invitation in a **separate browser or incognito window**. Click **Email verification code**, enter the six-digit code received, review the privacy/timer notice, check the acknowledgement box, and select **Start assessment**. Test back navigation, changed answers, and a tab switch. Your time does not pause on tab switches or disconnections. Optional fullscreen may be unavailable on some devices.
+7. Submit normally (or allow the clock to expire). In the recruiter dashboard, open the same JD → **Candidates & evidence reports** → **View report**. Verify all questions, answer options, the candidate's answer, best answer, explanation, changes, time, score, requirements and browser activity. Select **Print / save PDF** to print or save from the browser.
+8. You can permanently delete any test candidate's invitation, responses, browser log and report using **Delete**. Only the organisation owner can delete; use this for your trial and to respond to deletion requests. This version has no automated retention deletion yet. Decide on and implement an appropriate retention schedule before a public launch.
 
-- Exact JD extraction cache from Step 2 is unchanged (`jd_extraction_cache`).
-- New collection `published_question_templates` contains only *recruiter-reviewed and published* question sets, with a signature that includes the organisation, role, seniority, experience and all approved requirements.
-- Exact approved match with sufficient questions: reuse the whole assessment. Similar approved role: require the same seniority and an 80%+ role-title overlap, matching all mandatory requirements in both directions; map each reused question to a matching approved requirement; cap reuse at 60%. The remaining questions are newly generated.
-- No candidate information is stored or reused in the cache. Cache lookups are limited to the currently authenticated recruiter's organisation. This is a conservative **keyword/requirements similarity cache**, not a semantic vector-search system; semantic matching may follow after testing its cost and accuracy.
-- OpenAI may also provide automatic prompt caching for repeated static instructions. Avoid changing the constant prompt wording on every request.
+## Pilot safeguards and boundaries
 
-## Data model
+- **Payment is not implemented yet.** No credits are charged or deducted during Step 4. Invitations fail closed unless `RECRUITER_PILOT_MODE=true`, and are limited to five per JD. Implement Razorpay credits/coupon verification with transactional credit reservation in the next build before inviting paying customers.
+- Each candidate receives a **32-byte random invitation token**, encrypted at rest for controlled recruiter resend, plus a separate six-digit OTP (**10-minute expiry, five guesses per code, max five OTP emails per invitation, at least one minute between sends**). Candidate session tokens are HMAC-signed, bound to a single active session and expire after 12 hours. An additional verification revokes the previous candidate session. The code/secret and answer keys are never returned to the browser.
+- Questions and answer choices are shuffled **per candidate**. They currently come from the same recruiter-approved published question set; truly distinct equivalent forms will require a larger vetted question bank and psychometric testing. Do not claim that the shuffled versions establish statistical equivalence.
+- The **server determines the deadline**, scores from the recruiter-approved answer key and calculates active per-question time from server timestamps + browser foreground signals. Client timers are purely visual. Offline/disconnected candidates resume if within their allotted duration; expiry is finalized when the candidate reconnects or the recruiter opens the JD. No timer pause is granted by disconnecting.
+- Browser monitoring logs **only** declared events (tabs, window focus, copy/paste, fullscreen exit, online/offline and 90-second inactivity). It never takes webcam snapshots, records video, accesses the microphone, reads another device or declares cheating. Browsers can miss events. Logs and time spent are supporting context, **not misconduct proof**.
+- Requirements with fewer than **three assessed questions** are labelled **Insufficient evidence** regardless of score. Reports deliberately show descriptive evidence, not a hire/reject decision. A recruiter must validate AI-drafted answer keys and question quality before publishing.
+- Existing **same-organisation approved question caching** from Step 3 is unchanged; candidate answers and reports are neither included nor reused in the cache. Org membership is checked for every recruiter API. All direct Firestore browser reads/writes remain denied.
 
-- `recruiter_assessments/{jobId}`: one assessment (V1) per JD, selected question count, draft generation progress, recruiter edits and final published questions. You cannot change the question count after starting, and published assessments cannot be modified. For a materially different JD or assessment, create a new job.
-- `published_question_templates`: organisation-scoped approved question-cache entries, created **only when the recruiter publishes**.
-- Existing `recruiter_jobs` status changes to `assessment_draft` and then `published`.
+## Data collections
 
-All new endpoints use the same Firebase ID token and recruiter organisation membership checks. Firestore client access remains denied; only authorised backend endpoints read/write question keys. No changes to Firebase security rules or GitHub secrets are needed.
+Existing: `recruiter_jobs`, `recruiter_assessments`, approved role/cache collections, `recruiter_organizations`, `recruiter_members`.
 
-## Checks and limitations
+New: `recruiter_invitations/{sha256(invitationToken)}` (only encrypted token, name/email, OTP digest/rate counters, verification, timer, answer records, per-question time and bounded browser events); `recruiter_reports/{invitationId}` (server-produced individual evidence report). Organisation ID is saved in both. The report API checks the signed-in recruiter's organisation.
 
-`npm test` uses built-in Node.js tests for caching, role compatibility, organisation isolation, invalid questions and requirement coverage. Vercel installs Node.js and production packages automatically; none are required on your personal computer.
+## Testing and operational notes
 
-- Only objective, **four-option, one-best-answer** screening questions in this version. AI-drafted answers and rationales are not authoritative: recruiters must verify accuracy and fairness before publishing.
-- Do not score or reject candidates automatically. Future reports should provide evidence and flag uncertainty for human judgement.
-- Generated batches are saved after every successful request; if a batch fails, press **Continue generation** instead of restarting or paying to regenerate completed batches.
-- The backend blocks concurrent generation with an expiring lock. Large AI batches and downstream API issues can occasionally require retrying.
-- The initial cache scans up to 100 templates within an organisation; larger organisations will need indexed search/pagination.
-- No site secrets belong in GitHub source code, browser HTML or screenshots.
+`npm test` (run in GitHub Actions, or optionally locally) covers question-cache isolation, OTP/session signatures, answer-key non-disclosure, duration checks, per-question timing, scoring, competency uncertainty and integrity reporting. **Automated tests do not constitute a live Firebase/Resend/Vercel end-to-end test**. Before paid release, test real emails (including spam/delivery), expiry, reconnection, deletion, accessibility and a candidate using a second device. Review Indian data-protection obligations and present a suitable privacy notice to real candidates.
+
+This implementation is **a controlled pilot**, not a production-ready payment or high-stakes proctoring system. If Vercel deployment fails, share the deployment error (never share private keys or candidate data). Keep existing Firebase Firestore production rules denying direct browser access.

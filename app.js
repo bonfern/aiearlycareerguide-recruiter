@@ -79,7 +79,7 @@ function renderApproved(approved) {
 }
 async function openJob(id) {
   clearNotification(); onlyView('job-panel');
-  hide('extraction-box'); hide('approved-box'); hide('assessment-box'); show('extract-actions');
+  hide('extraction-box'); hide('approved-box'); hide('assessment-box'); hide('candidates-box'); hide('report-box'); show('extract-actions');
   currentAssessment = null; workingQuestions = [];
   byId('extract-btn').disabled = true;
   try {
@@ -289,6 +289,7 @@ async function loadAssessment() {
   workingQuestions=(currentAssessment?.questions||[]).map(q=>({...q,options:[...q.options]}));
   savedSnapshot=JSON.stringify(workingQuestions);
   assessmentDisplay();
+  if (currentAssessment?.status === 'published') await loadCandidates(); else hide('candidates-box');
 }
 byId('start-assessment-btn').addEventListener('click',async()=>{
   if(!currentJob?.approvedRequirements)return;
@@ -330,9 +331,113 @@ byId('publish-btn').addEventListener('click',async()=>{
   clearNotification();const btn=byId('publish-btn');btn.disabled=true;
   try{
     await api('/api/assessment',{method:'POST',body:JSON.stringify({action:'publish',jobId:currentJob.id})});
-    await loadAssessment();notify('Assessment published. Approved questions are now eligible for reuse in similar roles. Candidate invitations come in Step 4.');
+    await loadAssessment();notify('Assessment published. You can now configure duration and invite pilot candidates below.');
   }catch(error){notify(error.message,true);btn.disabled=false;}
 });
+
+
+// STEP 4 — candidate invitations and evidence reporting, restricted to the signed-in recruiter's organisation.
+let invitations=[];
+const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);if(className)node.className=className;return node;};
+async function loadCandidates(){
+  if(!currentJob||currentAssessment?.status!=='published')return hide('candidates-box');
+  const result=await api(`/api/invitations?jobId=${encodeURIComponent(currentJob.id)}`);
+  invitations=result.invitations;show('candidates-box');
+  byId('candidate-total').textContent=`${invitations.length} candidates`;
+  byId('assessment-duration').value=result.durationMinutes||({15:25,25:40,40:60}[currentAssessment.targetCount]||40);
+  const locked=invitations.length>0;byId('assessment-duration').disabled=locked;byId('save-duration-btn').disabled=locked;
+  byId('invite-btn').disabled=!result.canInvite;
+  byId('candidate-empty').textContent=invitations.length?'':result.pilotMode?'No invitations yet.':'Invitations disabled until credits are enabled.';
+  const body=byId('candidate-table');body.replaceChildren();
+  invitations.forEach(item=>{
+    const tr=el('tr');
+    const name=el('td');name.append(el('strong',item.name),el('div',item.email,'muted fine'));
+    const status=el('td',item.status.replaceAll('_',' '));
+    const delivery=el('td',item.deliveryStatus);
+    const added=el('td',new Date(item.invitedAt).toLocaleDateString('en-IN'));
+    const actions=el('td');const row=el('div',undefined,'actions compact-actions');
+    if(item.status==='completed'){
+      const button=el('button','View report','secondary compact');button.type='button';
+      button.addEventListener('click',()=>openReport(item.id));row.append(button);
+    } else if(item.status!=='expired'){
+      const copy=el('button','Copy link','secondary compact');copy.type='button';
+      copy.addEventListener('click',async()=>{try{const result=await api('/api/invitations',{method:'POST',body:JSON.stringify({jobId:currentJob.id,action:'link',invitationId:item.id})});
+        await navigator.clipboard.writeText(result.link);notify('Unique invitation link copied. Send it only to the intended candidate.');}catch(error){notify(error.message,true);}});
+      const resend=el('button','Resend email','secondary compact');resend.type='button';
+      resend.addEventListener('click',async()=>{resend.disabled=true;try{await api('/api/invitations',{method:'POST',body:JSON.stringify({jobId:currentJob.id,action:'resend',invitationId:item.id})});
+        notify('Invitation email sent.');await loadCandidates();}catch(error){notify(error.message,true);}finally{resend.disabled=false;}});
+      row.append(copy,resend);
+    }
+    const del=el('button','Delete','secondary compact');del.type='button';
+    del.addEventListener('click',async()=>{
+      if(!window.confirm(`Permanently delete ${item.name}'s invitation, answers, integrity events and report? This cannot be undone.`))return;
+      del.disabled=true;try{await api('/api/invitations',{method:'POST',body:JSON.stringify({jobId:currentJob.id,action:'delete',invitationId:item.id})});
+        hide('report-box');await loadCandidates();notify('Candidate data permanently deleted.');}
+      catch(error){notify(error.message,true);del.disabled=false;}
+    });
+    row.append(del);
+    actions.append(row);tr.append(name,status,delivery,added,actions);body.append(tr);
+  });
+}
+byId('save-duration-btn').addEventListener('click',async()=>{
+  const minutes=Number(byId('assessment-duration').value);
+  if(!Number.isInteger(minutes)||minutes<10||minutes>120)return notify('Choose a duration from 10 to 120 minutes.',true);
+  const button=byId('save-duration-btn');button.disabled=true;
+  try{await api('/api/assessment',{method:'POST',body:JSON.stringify({jobId:currentJob.id,action:'duration',durationMinutes:minutes})});
+    notify(`Assessment duration saved: ${minutes} minutes.`);}catch(error){notify(error.message,true);}finally{button.disabled=false;}
+});
+byId('invite-form').addEventListener('submit',async event=>{
+  event.preventDefault();clearNotification();const button=byId('invite-btn');button.disabled=true;
+  try{const result=await api('/api/invitations',{method:'POST',body:JSON.stringify({jobId:currentJob.id,action:'create',
+    name:byId('candidate-name').value,email:byId('candidate-email').value})});
+    byId('invitation-link').value=result.link;byId('invitation-note').textContent=result.note;
+    show('invitation-result');byId('invite-form').reset();await loadCandidates();notify('Candidate invitation created.');
+  }catch(error){notify(error.message,true);}finally{if(invitations.length<5)button.disabled=false;}
+});
+byId('copy-invite-btn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(byId('invitation-link').value);notify('Link copied.');}catch(error){notify(error.message,true);}});
+byId('report-close-btn').addEventListener('click',()=>hide('report-box'));
+byId('report-print-btn').addEventListener('click',()=>window.print());
+function reportLine(parent,label,value){const p=el('p');p.append(el('strong',`${label}: `),document.createTextNode(String(value??'—')));parent.append(p);}
+async function openReport(id){
+  hide('report-box');clearNotification();
+  try{
+    const {report:r}=await api(`/api/report?invitationId=${encodeURIComponent(id)}`);
+    byId('report-title').textContent=`${r.candidateName} — ${r.jobTitle}`;
+    const content=byId('report-content');content.replaceChildren();
+    const intro=el('div',undefined,'report-intro');intro.append(el('p','Assessment evidence, not an automated hiring decision.','muted'));
+    const summary=el('div',undefined,'report-metrics');
+    for(const [label,value] of [['Score',`${r.score}% (${r.correct}/${r.total})`],['Attempted',`${r.attempted}/${r.total}`],
+      ['Time',`${Math.floor(r.elapsedSeconds/60)}m ${r.elapsedSeconds%60}s`],['Outcome',r.finishReason.replaceAll('_',' ')]]){
+      const box=el('div',undefined,'report-metric');box.append(el('span',label),el('strong',value));summary.append(box);}
+    intro.append(summary);reportLine(intro,'Assessment version',r.assessmentVersion);reportLine(intro,'Candidate email',r.candidateEmail);
+    content.append(intro,el('h3','Competency evidence'));
+    const table=el('table');const head=el('tr');['JD requirement','Correct / asked','Rating'].forEach(x=>head.append(el('th',x)));table.append(head);
+    r.competencies.forEach(c=>{const row=el('tr');row.append(el('td',c.requirement),el('td',`${c.correct}/${c.total}`),el('td',c.level));table.append(row);});content.append(table);
+    content.append(el('h3','Question-level evidence'));
+    r.details.forEach(q=>{
+      const card=el('div',undefined,'question-card report-question');card.append(el('h4',`Question ${q.order}: ${q.question}`));
+      reportLine(card,'Competency',q.competency);reportLine(card,'Type',q.type);
+      const options=el('ol');options.type='A';q.options.forEach((text,index)=>{
+        const li=el('li',text);if(index===q.correctIndex)li.classList.add('correct-option');
+        if(index===q.selectedIndex)li.classList.add('chosen-option');options.append(li);});card.append(options);
+      reportLine(card,'Candidate selected',q.selectedIndex===null?'Not answered':`Option ${'ABCD'[q.selectedIndex]} — ${q.options[q.selectedIndex]}`);
+      reportLine(card,'Correct / preferred',`Option ${'ABCD'[q.correctIndex]} — ${q.options[q.correctIndex]}`);
+      reportLine(card,'Evaluation',q.isCorrect===null?'Not attempted':q.isCorrect?'Correct':'Incorrect');
+      reportLine(card,'Explanation',q.rationale);reportLine(card,'Estimated active time',`${q.timeSeconds}s`);
+      reportLine(card,'Answer changes',q.changes);content.append(card);
+    });
+    content.append(el('h3','Browser integrity log'));
+    reportLine(content,'Logged events',r.integrity.eventCount);
+    const info=el('div',undefined,'callout');
+    for(const [name,count] of Object.entries(r.integrity.counts||{}))reportLine(info,name.replaceAll('_',' '),count);
+    if(!r.integrity.eventCount)info.append(el('p','No browser events logged. This does not guarantee independent work.'));
+    const events=el('details');events.append(el('summary','View event timeline'));
+    const list=el('ul');(r.integrity.events||[]).forEach(e=>list.append(el('li',`${new Date(e.at).toLocaleString('en-IN')}: ${e.type.replaceAll('_',' ')} (question ${e.questionIndex+1})`)));
+    events.append(list);info.append(events);content.append(info);
+    const caveats=el('div',undefined,'callout');r.limitations.forEach(x=>caveats.append(el('p',x)));
+    content.append(caveats);show('report-box');byId('report-box').scrollIntoView({behavior:'smooth'});
+  }catch(error){notify(error.message,true);}
+}
 
 try {
   const response = await fetch('/api/public-config'); const config = await response.json();
