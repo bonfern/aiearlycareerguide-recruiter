@@ -1,6 +1,7 @@
 import {requireRecruiter,reject} from './_auth.js';
 import {finalizeAttempt} from './_candidate.js';
 import {polishProfile} from './_profile.js';
+import {enrichReportV3} from '../lib/report-v3.js';
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
@@ -15,6 +16,7 @@ export default async function handler(req,res){
     const doc=await reportRef.get();
     if(!doc.exists||doc.data().orgId!==user.orgId)return res.status(404).json({error:'The candidate has not completed this assessment yet'});
     let report=doc.data();
+    if(report.reportVersion===3) report=enrichReportV3(report);
     if(report.reportVersion===2 && report.profile?.source==='Rule-based interpretation of actual responses' && process.env.OPENAI_API_KEY){
       const updated=await polishProfile(report);
       if(updated){

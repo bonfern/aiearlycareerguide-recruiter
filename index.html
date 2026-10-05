@@ -68,7 +68,7 @@
     <section id="job-panel" class="card hidden">
       <div class="section-head"><div><p class="eyebrow">STEP 2 · AI REQUIREMENT EXTRACTION</p><h1 id="detail-title">Job</h1><p class="muted" id="detail-status"></p></div><button id="detail-back-btn" type="button" class="secondary">Back to dashboard</button></div>
       <details id="requirements-section" class="workspace-section" open>
-        <summary class="workspace-summary"><span><small>STEP 2</small><strong>JD and approved requirements</strong></span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
+        <summary class="workspace-summary"><span><small>STEP 2</small><strong>JD and Approved Requirements</strong></span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
         <div class="workspace-content">
       <details class="jd-preview"><summary>View original job description</summary><pre id="detail-jd"></pre></details>
       <div id="extract-actions" class="actions"><button id="extract-btn" type="button">Extract requirements with AI</button></div>
@@ -93,13 +93,14 @@
         </div>
       </details>
       <details id="assessment-box" class="hidden workspace-section assessment-section">
-        <summary class="workspace-summary"><span><small>STEP 3</small><strong>Assessment and question bank</strong></span><span class="tag" id="assessment-status">Not started</span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
+        <summary class="workspace-summary"><span><small>STEP 3</small><strong>Assessment and Question Bank</strong></span><span class="tag" id="assessment-status">Not started</span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
         <div class="workspace-content">
 
         <div id="assessment-setup">
           <p class="muted">This assessment tests only the most critical technical and behavioural skills. Years of experience and education are not assessed. Propose the focus, edit the groups and question allocation, then approve before creating the assessment. Existing published assessments remain unchanged.</p>
           <label for="question-count">Assessment length</label>
-          <select id="question-count"><option value="20" selected>Short — 20 questions · 30 minutes · 4 competencies</option><option value="30">Standard — 30 questions · 45 minutes · 5 competencies</option><option value="40">Detailed — 40 questions · 60 minutes · 6 competencies</option></select>
+          <select id="question-count" class="compact-select"><option value="20" selected>Essential — 20 questions · ~30 min · 1 credit</option><option value="30">Standard — 30 questions · ~45 min · 1.5 credits</option><option value="40">Advanced — 40 questions · ~60 min · 2 credits</option></select>
+          <p class="muted fine assessment-tier-note">Credit values define future candidate-assessment usage. No credits are charged during pilot mode.</p>
           <div class="actions"><button type="button" id="propose-focus-btn">1. Propose critical competencies with AI</button></div>
           <div id="focus-panel" class="hidden"><p class="callout">Review competency names, linked JD requirements and question counts. Focus on what matters most for this role. Exclude qualifications, educational credentials and years of experience from all competency groups.</p>
             <div id="focus-list"></div><p id="focus-count-note" class="muted"></p>
@@ -118,17 +119,17 @@
         </div>
       </details>
       <details id="candidates-box" class="hidden workspace-section assessment-section">
-        <summary class="workspace-summary"><span><small>STEP 4</small><strong>Candidates and reports</strong></span><span class="tag" id="candidate-total">0 candidates</span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
+        <summary class="workspace-summary"><span><small>STEP 4</small><strong>Candidates and Reports</strong></span><span class="tag" id="candidate-total">0 candidates</span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
         <div class="workspace-content">
 
         <div class="callout">Each candidate gets a unique invitation, email OTP and a timed assessment. Browser activity is logged but is <strong>not proof of misconduct</strong>. This pilot is limited to 5 candidates per JD until payment credits are enabled.</div>
-        <div class="duration-control"><label for="assessment-duration">Overall assessment duration (minutes)</label>
+        <div class="duration-control"><label for="assessment-duration">Overall Assessment Duration (Minutes)</label>
           <div class="actions"><input id="assessment-duration" type="number" min="10" max="120" step="1" value="40" />
           <button class="secondary" type="button" id="save-duration-btn">Save duration</button></div>
           <p class="muted fine">Current defaults: 20 questions = 30 minutes; 30 = 45 minutes; 40 = 60 minutes. Older published assessments retain their original duration. This becomes fixed after the first invitation.</p></div>
         <form id="invite-form" class="candidate-invite-form">
-          <div class="two-col"><div><label for="candidate-name">Candidate name</label><input id="candidate-name" required minlength="2" maxlength="120" autocomplete="off" placeholder="Candidate's full name" /></div>
-            <div><label for="candidate-email">Candidate email</label><input id="candidate-email" required type="email" autocomplete="off" placeholder="candidate@example.com" /></div></div>
+          <div class="two-col"><div><label for="candidate-name">Candidate Name</label><input id="candidate-name" required minlength="2" maxlength="120" autocomplete="off" placeholder="Candidate's full name" /></div>
+            <div><label for="candidate-email">Candidate Email</label><input id="candidate-email" required type="email" autocomplete="off" placeholder="candidate@example.com" /></div></div>
           <div class="actions"><button id="invite-btn" type="submit">Send secure invitation</button></div>
         </form>
         <div id="invitation-result" class="callout hidden"><strong>Invitation link</strong><p id="invitation-note"></p><input id="invitation-link" readonly aria-label="Secure candidate invitation link" /><div class="actions"><button type="button" class="secondary" id="copy-invite-btn">Copy link</button></div></div>

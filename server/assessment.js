@@ -51,8 +51,10 @@ export default async function handler(req, res) {
         const focus=latestJob.data().assessmentFocusApproved;
         if (!focus || focus.version!==FOCUS_VERSION || focus.targetCount!==targetCount) throw Object.assign(new Error('Approve the critical competency focus for this assessment length first'),{status:409});
         if (current.exists) return view(current); // Explicitly prevent overwriting previously generated/published questions.
+        const size=V2_SIZES[targetCount];
         const value = {orgId:user.orgId, jobId, targetCount, status:'draft', version:1, questions:[], cacheInitialized:false,
-          generatedCount:0, reusedCount:0, questionVersion:FOCUS_VERSION,focus:latestJob.data().assessmentFocusApproved, durationMinutes:V2_SIZES[targetCount].minutes,createdAt:new Date(), updatedAt:new Date()};
+          generatedCount:0, reusedCount:0, questionVersion:FOCUS_VERSION,focus:latestJob.data().assessmentFocusApproved,
+          assessmentTier:size.tier,creditCost:size.credits,durationMinutes:size.minutes,createdAt:new Date(), updatedAt:new Date()};
         tx.create(ref,value); tx.update(jobRef,{status:'assessment_draft',updatedAt:new Date()});
         return {...value, id:jobId};
       });

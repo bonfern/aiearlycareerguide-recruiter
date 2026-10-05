@@ -24,6 +24,13 @@ const actionLabels={assessment:'Preparing assessment…',candidate:'Loading cand
   'generate-questions':'Generating distinct questions and checking quality…',invitations:'Updating candidate invitations…',
   invite:'Sending invitation…',jobs:'Loading jobs…',job:'Saving job details…',report:'Preparing candidate report…',
   'parse-jd':'Reading job description…',requirements:'Saving approved requirements…'};
+const assessmentTiers={
+  20:{name:'Essential',minutes:30,credits:1,competencies:4},
+  30:{name:'Standard',minutes:45,credits:1.5,competencies:5},
+  40:{name:'Advanced',minutes:60,credits:2,competencies:6}
+};
+const displayQuestionType=value=>({'Situational judgement':'Situational Judgement','Problem solving':'Problem Solving',
+  'Stakeholder management':'Stakeholder Management'}[value]||value);
 function processing(visible,message){
   const panel=byId('processing-status');if(!panel)return;
   if(visible){panel.textContent=message||'Processing your request…';panel.classList.remove('hidden');}
@@ -285,7 +292,8 @@ function drawFocus(){
 function updateFocusTotal(){
   if(!workingFocus)return;
   const used=workingFocus.groups.reduce((n,g)=>n+(Number.isFinite(g.questionCount)?g.questionCount:0),0);
-  byId('focus-count-note').textContent=`${used} / ${workingFocus.targetCount} questions allocated across ${workingFocus.groups.length} critical competencies. ${used===workingFocus.targetCount?'Ready to approve.':'Adjust the question counts before approval.'}`;
+  const tier=assessmentTiers[workingFocus.targetCount];
+  byId('focus-count-note').textContent=`${tier?.name||'Assessment'} · ${used} / ${workingFocus.targetCount} questions allocated across ${workingFocus.groups.length} critical competencies · ${tier?.credits||workingFocus.creditCost||'—'} credit${(tier?.credits||workingFocus.creditCost)===1?'':'s'} per candidate when payments are enabled. ${used===workingFocus.targetCount?'Ready to approve.':'Adjust the question counts before approval.'}`;
 }
 byId('question-count').addEventListener('change',()=>{if(workingFocus&&!focusApproved){workingFocus=null;hide('focus-panel');notify('Question count changed. Generate a new competency proposal for this length.');}});
 byId('propose-focus-btn').addEventListener('click',async()=>{
@@ -313,7 +321,7 @@ const qEl = (name, value, rows = 0, maxLength = 260) => {
 };
 function selectField(values, selected, label, changed) {
   const s = document.createElement('select'); s.setAttribute('aria-label', label);
-  values.forEach(v => s.append(makeOption(v, selected)));
+  values.forEach(v => {const option=makeOption(v, selected);option.textContent=displayQuestionType(v);s.append(option);});
   s.addEventListener('change',() => changed(s.value));
   return s;
 }
@@ -360,7 +368,8 @@ function assessmentDisplay() {
   hide('assessment-setup');show('assessment-workspace');
   const a=currentAssessment;
   byId('assessment-status').textContent=displayStatus(a.status);
-  byId('generation-info').textContent=`${workingQuestions.length} of ${a.targetCount} questions prepared. ${a.reusedCount||0} approved questions reused. ${(a.blueprintDraftCount||a.blueprintDraft?.length)&&!a.blueprint?`Planning ${a.blueprintDraftCount??a.blueprintDraft.length} of ${a.targetCount} distinct topics. `:''}${a.status==='published'?'Assessment published and locked.':'Each question targets a distinct scenario.'}`;
+  const tier=assessmentTiers[a.targetCount]||{name:a.assessmentTier||'Assessment',credits:a.creditCost||'—'};
+  byId('generation-info').textContent=`${tier.name} assessment · ${a.targetCount} questions · ${tier.credits} credit${tier.credits===1?'':'s'} per candidate when payments are enabled. ${workingQuestions.length} of ${a.targetCount} questions prepared. ${a.reusedCount||0} approved questions reused. ${(a.blueprintDraftCount||a.blueprintDraft?.length)&&!a.blueprint?`Planning ${a.blueprintDraftCount??a.blueprintDraft.length} of ${a.targetCount} distinct topics. `:''}${a.status==='published'?'Assessment published and locked.':'Each question targets a distinct scenario.'}`;
   if(a.status==='draft')show('reset-draft-btn');else hide('reset-draft-btn');
   if(a.status==='published') {hide('generation-controls');hide('assessment-actions');drawQuestions();return;}
   if(workingQuestions.length<a.targetCount) {
@@ -513,7 +522,7 @@ byId('report-print-btn').addEventListener('click',()=>{document.querySelectorAll
 function reportLine(parent,label,value){const p=el('p');p.append(el('strong',`${label}: `),document.createTextNode(String(value??'—')));parent.append(p);}
 function renderEvidenceQuestions(parent,r){
   const appendix=el('details',undefined,'report-appendix');appendix.id='report-appendix';
-  appendix.append(el('summary',`Full question-level evidence · ${r.details.length} questions`));
+  appendix.append(el('summary',`Detailed Question Evidence · ${r.details.length} Questions`));
   const body=el('div',undefined,'report-appendix-content');
   r.details.forEach(q=>{
     const card=el('div',undefined,'question-card report-question report-compact');
@@ -570,9 +579,9 @@ function renderV2Report(parent,r){
 function renderV3Report(parent,r){
   const profile=r.profile||{};
   const executive=el('section',undefined,'report-executive');
-  executive.append(el('h3','Candidate assessment summary'),el('p',profile.summary||'Assessment summary unavailable.'));
+  executive.append(el('h3','Candidate Assessment Summary'),el('p',profile.summary||'Assessment summary unavailable.'));
   const highlights=el('div',undefined,'report-highlights');
-  for(const [title,items] of [['What the responses showed',profile.strengths],['Areas to explore in the interview',profile.weaknesses]]){
+  for(const [title,items] of [['Evidence From Stronger Responses',profile.strengths],['Areas to Explore Further',profile.weaknesses]]){
     if(!items?.length)continue;
     const box=el('section',undefined,'report-highlight');box.append(el('h4',title));
     const list=el('ul');items.forEach(item=>{
@@ -581,18 +590,53 @@ function renderV3Report(parent,r){
     });box.append(list);highlights.append(box);
   }
   executive.append(highlights);parent.append(executive);
-  const groups=el('section',undefined,'report-executive');groups.append(el('h3','Performance by competency'));
+
+  const groups=el('section',undefined,'report-executive');groups.append(el('h3','Performance by Competency'));
+  const insightByName=new Map((profile.competencyInsights||[]).map(x=>[x.name,x]));
   r.competencies.filter(c=>c.total>0).forEach(c=>{
     const row=el('div',undefined,'report-competency');
     const title=el('div',undefined,'report-competency-header');title.append(el('strong',c.name),el('span',`${c.correct}/${c.total} · ${c.score}%`));row.append(title);
     const track=el('div',undefined,'report-progress'),fill=el('div',undefined,'report-progress-fill');fill.style.width=`${c.score}%`;track.append(fill);row.append(track);
-    const relevant=r.details.filter(q=>q.competency===c.name);
-    const right=relevant.filter(q=>q.isCorrect).length;
-    const level=c.score>=80?'High score':c.score>=60?'Mixed results':'Requires further exploration';
-    row.append(el('p',`${level} · ${right} correct, ${relevant.length-right} missed`, 'muted'));
+    const insight=insightByName.get(c.name);
+    const relevant=r.details.filter(q=>q.competency===c.name),missed=relevant.filter(q=>q.isCorrect===false);
+    const outcome=c.score>=80?'Most tested questions were answered correctly.':c.score>=60?'The responses were mixed across the tested questions.':'Several tested questions were missed and should be explored further.';
+    row.append(el('p',outcome,'muted'));
+    if(insight?.topics?.length)row.append(el('p',`Tested areas included: ${insight.topics.join(' · ')}`,'report-tested-topics'));
+    if(missed.length)row.append(el('p',`Missed question${missed.length===1?'':'s'}: ${missed.slice(0,3).map(q=>`Q${q.order}`).join(', ')}`,'muted fine'));
     groups.append(row);
-  });groups.append(el('p','These scores describe answers to the tested questions, not demonstrated workplace ability.','muted fine'));parent.append(groups);
-  const validation=el('section',undefined,'report-executive');validation.append(el('h3','Suggested interview validation'));
+  });
+  groups.append(el('p','Competency results describe performance only on the questions presented in this assessment.','muted fine'));parent.append(groups);
+
+  const typeSection=el('section',undefined,'report-executive');typeSection.append(el('h3','Performance by Question Type'));
+  const typeTable=el('table',undefined,'report-type-table');
+  const typeHead=el('tr');['Question Type','Correct / Asked','Score'].forEach(x=>typeHead.append(el('th',x)));typeTable.append(typeHead);
+  (profile.questionTypePerformance||[]).forEach(t=>{const row=el('tr');row.append(el('td',displayQuestionType(t.type)),el('td',`${t.correct}/${t.total}`),el('td',`${t.score}%`));typeTable.append(row);});
+  if((profile.questionTypePerformance||[]).length)typeSection.append(typeTable);
+  else typeSection.append(el('p','Question-type breakdown unavailable.','muted'));
+  parent.append(typeSection);
+
+  const timing=el('section',undefined,'report-executive');timing.append(el('h3','Response Pattern and Timing'));
+  const t=profile.timingProfile||{};
+  const timingGrid=el('div',undefined,'report-timing-grid');
+  const timingStats=[
+    ['Total Time',`${Math.floor(r.elapsedSeconds/60)}m ${r.elapsedSeconds%60}s`],
+    ['Avg. Active Time / Question',`${t.averageActiveSeconds??Math.round(r.elapsedSeconds/Math.max(1,r.total))}s`],
+    ['Median Active Time',`${t.medianActiveSeconds??'—'}s`],
+    ['Answer Changes',String(t.answerChanges??r.details.reduce((n,q)=>n+(q.changes||0),0))]
+  ];
+  timingStats.forEach(([label,value])=>{const box=el('div',undefined,'report-timing-stat');box.append(el('span',label),el('strong',value));timingGrid.append(box);});
+  timing.append(timingGrid);
+  if(Number.isFinite(t.quickResponses)&&t.quickResponses>0)timing.append(el('p',`${t.quickResponses} question${t.quickResponses===1?' was':'s were'} answered in 10 seconds or less. Treat this only as timing context; question difficulty varies.`,'muted fine'));
+  reportLine(timing,'Sustained Tab Changes',r.integrity.confirmedTabChanges||0);
+  timing.append(el('p',r.integrity.description,'muted fine'));
+  if(r.integrity.events?.length){const events=el('details');events.append(el('summary','View Recorded Tab Changes'));
+    const eventList=el('ul');r.integrity.events.forEach(e=>eventList.append(el('li',`${e.seconds}s away from assessment · Question ${(e.questionIndex||0)+1}`)));
+    events.append(eventList);timing.append(events);
+  }
+  parent.append(timing);
+
+  const validation=el('section',undefined,'report-executive');validation.append(el('h3','Suggested Interview Validation'));
+  validation.append(el('p','Use these prompts to validate the depth of the candidate’s reasoning, practical application and other important role capabilities.','muted'));
   const list=el('ol',undefined,'interview-validation');
   (profile.interviewValidation||[]).forEach(v=>{
     const item=el('li');item.append(el('strong',v.competency),el('p',v.question),el('p',`What to look for: ${v.lookFor}`,'muted fine'));
@@ -601,17 +645,9 @@ function renderV3Report(parent,r){
   if(!list.children.length)validation.append(el('p','Ask the candidate to explain how they would apply their answers to real workplace situations.'));
   else validation.append(list);
   parent.append(validation);
-  const timing=el('section',undefined,'report-executive');timing.append(el('h3','Assessment time and browser activity'));
-  reportLine(timing,'Average time per question',`${Math.round(r.elapsedSeconds/Math.max(1,r.total))} seconds`);
-  reportLine(timing,'Sustained tab changes',r.integrity.confirmedTabChanges||0);
-  timing.append(el('p',r.integrity.description,'muted fine'));
-  if(r.integrity.events?.length){const events=el('details');events.append(el('summary','View recorded tab changes'));
-    const eventList=el('ul');r.integrity.events.forEach(e=>eventList.append(el('li',`${e.seconds}s away from assessment · Question ${(e.questionIndex||0)+1}`)));
-    events.append(eventList);timing.append(events);
-  }
-  parent.append(timing);
+
   renderEvidenceQuestions(parent,r);
-  const note=el('section',undefined,'report-disclaimer');note.append(el('h3','About this assessment'));
+  const note=el('section',undefined,'report-disclaimer');note.append(el('h3','About This Assessment'));
   (r.limitations||[]).forEach(x=>note.append(el('p',x)));parent.append(note);
 }
 async function openReport(id){
@@ -620,7 +656,7 @@ async function openReport(id){
     const {report:r}=await api(`/api/report?invitationId=${encodeURIComponent(id)}`);
     byId('report-title').textContent=`${r.candidateName} · ${r.jobTitle}`;
     const content=byId('report-content');content.replaceChildren();
-    const intro=el('div',undefined,'report-intro');intro.append(el('p','Assessment evidence, not an automated hiring decision.','muted'));
+    const intro=el('div',undefined,'report-intro');intro.append(el('p','Evidence-based screening report for recruiter review.','muted'));
     const summary=el('div',undefined,'report-metrics');
     const metrics=r.reportVersion===3?[['Score',`${r.score}% (${r.correct}/${r.total})`],['Questions answered',`${r.attempted}/${r.total}`],['Time taken',`${Math.floor(r.elapsedSeconds/60)}m ${r.elapsedSeconds%60}s`]]:
       [['Score',`${r.score}% (${r.correct}/${r.total})`],['Attempted',`${r.attempted}/${r.total}`],
