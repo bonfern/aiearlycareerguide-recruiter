@@ -20,10 +20,12 @@ let generating = false;
 let workingFocus = null;
 let focusApproved = false;
 let activeRequests=0;
+let walletState=null;
+let selectedPackageId=null;
 const actionLabels={assessment:'Preparing assessment…',candidate:'Loading candidate data…',focus:'Reviewing critical competencies…',extract:'Extracting job requirements…',
   'generate-questions':'Generating distinct questions and checking quality…',invitations:'Updating candidate invitations…',
   invite:'Sending invitation…',jobs:'Loading jobs…',job:'Saving job details…',report:'Preparing candidate report…',
-  'parse-jd':'Reading job description…',requirements:'Saving approved requirements…'};
+  'parse-jd':'Reading job description…',requirements:'Saving approved requirements…',wallet:'Updating credit wallet…'};
 const assessmentTiers={
   20:{name:'Essential',minutes:30,credits:1,competencies:4},
   30:{name:'Standard',minutes:45,credits:1.5,competencies:5},
@@ -84,14 +86,101 @@ function renderJobs(filter = '') {
     ? 'No jobs yet. Select “Create job” to begin.' : visible.length === 0 ? 'No matching jobs.' : '';
 }
 async function refresh() {
-  const [me, listing] = await Promise.all([api('/api/me'), api('/api/jobs')]);
+  const [me, listing, wallet] = await Promise.all([api('/api/me'), api('/api/jobs'), api('/api/wallet')]);
   byId('org-name').textContent = me.organizationName; jobs = listing.jobs;
   byId('total-jobs').textContent = String(jobs.length);
   byId('published-jobs').textContent = String(jobs.filter(j => j.status === 'published').length);
   byId('total-candidates').textContent = String(jobs.reduce((sum, job) => sum + job.candidateCount, 0));
   byId('total-completed').textContent = String(jobs.reduce((sum, job) => sum + job.completedCount, 0));
-  renderJobs(byId('search').value);
+  renderJobs(byId('search').value);renderWallet(wallet);
 }
+const formatCredits=value=>{const n=Number(value)||0;return Number.isInteger(n)?String(n):n.toFixed(1).replace(/\.0$/,'');};
+const formatInr=value=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(value)||0);
+function activityLabel(item){
+  if(item.type==='purchase')return 'Credit Purchase';
+  if(item.type==='assessment_use')return 'Assessment Started';
+  return displayStatus(item.type||'Credit Activity');
+}
+function renderCreditActivity(items=[]){
+  const body=byId('credit-activity');body.replaceChildren();
+  items.forEach(item=>{
+    const row=document.createElement('tr');
+    const date=document.createElement('td');date.textContent=item.createdAt?new Date(item.createdAt).toLocaleString('en-IN'):'—';
+    const activity=document.createElement('td');activity.textContent=activityLabel(item);
+    const credits=document.createElement('td');const amount=Number(item.credits)||0;credits.textContent=`${amount>0?'+':''}${formatCredits(amount)}`;credits.className=amount<0?'credit-negative':'credit-positive';
+    const details=document.createElement('td');details.textContent=item.type==='purchase'?`${item.packageName||'Credit package'}${item.couponCode?` · Coupon ${item.couponCode}`:''}${item.amountInr?` · ${formatInr(item.amountInr)}`:''}`:
+      item.type==='assessment_use'?`${item.candidateName||'Candidate'}${item.candidateEmail?` · ${item.candidateEmail}`:''}`:'—';
+    row.append(date,activity,credits,details);body.append(row);
+  });
+  byId('credit-empty').textContent=items.length?'':'No credit activity yet.';
+}
+function packageButton(pkg){
+  const card=document.createElement('article');card.className='credit-package';
+  const top=document.createElement('div');top.className='credit-package-top';
+  const name=document.createElement('h3');name.textContent=pkg.name;
+  const credits=document.createElement('strong');credits.textContent=`${pkg.credits} Credits`;top.append(name,credits);
+  const price=document.createElement('p');price.className='credit-price';price.textContent=formatInr(pkg.priceInr);
+  const rate=document.createElement('p');rate.className='muted fine';rate.textContent=`Approx. ${formatInr(pkg.pricePerCreditInr)} per credit before any coupon${walletState?.taxPercent?` · ${walletState.taxPercent}% tax configured`:''}.`;
+  const button=document.createElement('button');button.type='button';button.textContent=`Buy ${pkg.credits} Credits`;button.className='secondary';
+  button.disabled=walletState?.pilotMode||!walletState?.paymentsConfigured;
+  button.addEventListener('click',()=>beginCreditPurchase(pkg.id));
+  card.append(top,price,rate,button);return card;
+}
+function renderWallet(data){
+  walletState=data;const w=data.wallet||{};
+  byId('wallet-available').textContent=formatCredits(w.availableCredits||0);
+  byId('wallet-reserved').textContent=formatCredits(w.reservedCredits||0);
+  byId('wallet-balance').textContent=formatCredits(w.balanceCredits||0);
+  byId('wallet-summary').textContent=`${formatCredits(w.availableCredits||0)} credits available`;
+  byId('pilot-wallet-note').classList.toggle('hidden',!data.pilotMode);
+  byId('sync-payments-btn').disabled=data.pilotMode||!data.paymentsConfigured;
+  const packages=byId('credit-packages');packages.replaceChildren();(data.packages||[]).forEach(pkg=>packages.append(packageButton(pkg)));
+  renderCreditActivity(data.transactions||[]);
+  byId('coupon-admin-box').classList.toggle('hidden',!data.isPlatformAdmin);
+  if(data.isPlatformAdmin){
+    const map=Object.fromEntries((data.packages||[]).map(p=>[p.id,p]));
+    for(const id of ['starter','basic','standard','growth','business'])if(byId(`price-${id}`)&&map[id])byId(`price-${id}`).value=String(map[id].priceInr);
+    loadCoupons().catch(error=>notify(error.message,true));
+  }
+  if(data.pilotMode)byId('checkout-note').textContent='Pilot mode is active. Set RECRUITER_PILOT_MODE=false when you are ready to test Razorpay payments.';
+  else if(!data.paymentsConfigured)byId('checkout-note').textContent='Add Razorpay test credentials in Vercel before buying credits.';
+  else byId('checkout-note').textContent='Enter a coupon if you have one, then choose a credit package.';
+}
+async function reloadWallet(){const data=await api('/api/wallet');renderWallet(data);return data;}
+async function beginCreditPurchase(packageId){
+  clearNotification();selectedPackageId=packageId;const couponCode=byId('checkout-coupon').value.trim();
+  try{
+    const quoted=await api('/api/wallet',{method:'POST',body:JSON.stringify({action:'quote',packageId,couponCode})});
+    const q=quoted.quote,couponText=quoted.coupon?` Coupon ${quoted.coupon.code} saves ${formatInr(q.discountInr)}.`:'';
+    byId('checkout-note').textContent=`${quoted.package.name}: ${quoted.package.credits} credits · Total ${formatInr(q.totalInr)}.${couponText}`;
+    if(!window.confirm(`Proceed to Razorpay checkout for ${quoted.package.credits} credits at ${formatInr(q.totalInr)}?`))return;
+    const order=await api('/api/wallet',{method:'POST',body:JSON.stringify({action:'create-order',packageId,couponCode})});
+    if(typeof window.Razorpay!=='function')throw new Error('Secure payment checkout did not load. Refresh the page and try again.');
+    const checkout=new window.Razorpay({key:order.keyId,amount:order.amount,currency:order.currency,name:'AI Early Career Guide',description:`${order.package.credits} Recruiter Assessment Credits`,
+      order_id:order.orderId,prefill:{email:order.email},notes:{purchase_id:order.purchaseId},theme:{color:'#087c84'},
+      handler:async response=>{
+        try{await api('/api/wallet',{method:'POST',body:JSON.stringify({action:'verify-payment',purchaseId:order.purchaseId,...response})});
+          await reloadWallet();notify(`${order.package.credits} credits added successfully.`);}
+        catch(error){notify(`${error.message} If payment was completed, use “Sync Recent Payments” before paying again.`,true);}
+      },modal:{ondismiss:()=>notify('Payment window closed. No credits are added unless payment is successfully captured.')}});
+    checkout.on('payment.failed',event=>notify(event.error?.description||'Payment was not completed.',true));checkout.open();
+  }catch(error){notify(error.message,true);}
+}
+async function loadCoupons(){
+  const result=await api('/api/wallet',{method:'POST',body:JSON.stringify({action:'list-coupons'})}),body=byId('coupon-table');body.replaceChildren();
+  (result.coupons||[]).forEach(c=>{
+    const row=document.createElement('tr');
+    const code=document.createElement('td');code.textContent=c.code;
+    const discount=document.createElement('td');discount.textContent=c.type==='percent'?`${c.value}%`:formatInr(c.value);
+    const uses=document.createElement('td');uses.textContent=c.maxUses?`${c.uses}/${c.maxUses}`:String(c.uses||0);
+    const expiry=document.createElement('td');expiry.textContent=c.expiresAt?new Date(c.expiresAt).toLocaleDateString('en-IN'):'No expiry';
+    const status=document.createElement('td');status.textContent=c.active?'Active':'Inactive';
+    const action=document.createElement('td'),btn=document.createElement('button');btn.type='button';btn.className='secondary compact';btn.textContent=c.active?'Deactivate':'Activate';
+    btn.addEventListener('click',async()=>{btn.disabled=true;try{await api('/api/wallet',{method:'POST',body:JSON.stringify({action:'toggle-coupon',code:c.code,active:!c.active})});await loadCoupons();notify(`Coupon ${c.code} updated.`);}catch(error){notify(error.message,true);}finally{btn.disabled=false;}});
+    action.append(btn);row.append(code,discount,uses,expiry,status,action);body.append(row);
+  });
+}
+
 async function goDashboard() { onlyView('dashboard'); clearNotification(); try {await refresh();} catch(error) {notify(error.message, true);} }
 function renderApproved(approved) {
   hide('extract-actions'); hide('extraction-box'); show('approved-box');
@@ -453,7 +542,7 @@ byId('publish-btn').addEventListener('click',async()=>{
   clearNotification();const btn=byId('publish-btn');btn.disabled=true;
   try{
     await api('/api/assessment',{method:'POST',body:JSON.stringify({action:'publish',jobId:currentJob.id})});
-    await loadAssessment();byId('assessment-box').open=false;byId('candidates-box').open=true;notify('Assessment published. You can now configure duration and invite pilot candidates below.');
+    await loadAssessment();byId('assessment-box').open=false;byId('candidates-box').open=true;notify('Assessment published. You can now configure duration and invite candidates below.');
   }catch(error){notify(error.message,true);btn.disabled=false;}
 });
 
@@ -469,7 +558,10 @@ async function loadCandidates(){
   byId('assessment-duration').value=result.durationMinutes||({15:25,20:30,25:40,30:45,40:60}[currentAssessment.targetCount]||40);
   const locked=invitations.length>0;byId('assessment-duration').disabled=locked;byId('save-duration-btn').disabled=locked;
   byId('invite-btn').disabled=!result.canInvite;
-  byId('candidate-empty').textContent=invitations.length?'':result.pilotMode?'No invitations yet.':'Invitations disabled until credits are enabled.';
+  byId('candidate-empty').textContent=invitations.length?'':result.pilotMode?'No invitations yet.':'No invitations yet.';
+  const note=byId('candidate-credit-note');
+  if(result.pilotMode)note.innerHTML='Each candidate gets a unique invitation, email OTP and a timed assessment. Browser activity is logged but is <strong>not proof of misconduct</strong>. Pilot mode is active; up to 5 candidates can be invited for this JD without using credits.';
+  else note.innerHTML=`Each candidate gets a unique invitation, email OTP and a timed assessment. Browser activity is logged but is <strong>not proof of misconduct</strong>. This assessment reserves <strong>${formatCredits(result.creditCostCredits||0)} credit${Number(result.creditCostCredits)===1?'':'s'}</strong> per invitation and consumes them only when the candidate starts. Available balance: <strong>${formatCredits(result.availableCredits||0)} credits</strong>.`;
   const body=byId('candidate-table');body.replaceChildren();
   invitations.forEach(item=>{
     const tr=el('tr');
@@ -514,9 +606,30 @@ byId('invite-form').addEventListener('submit',async event=>{
     name:byId('candidate-name').value,email:byId('candidate-email').value})});
     byId('invitation-link').value=result.link;byId('invitation-note').textContent=result.note;
     show('invitation-result');byId('invite-form').reset();await loadCandidates();notify('Candidate invitation created.');
-  }catch(error){notify(error.message,true);}finally{if(invitations.length<5)button.disabled=false;}
+  }catch(error){notify(error.message,true);}finally{await loadCandidates().catch(()=>{});}
 });
 byId('copy-invite-btn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(byId('invitation-link').value);notify('Link copied.');}catch(error){notify(error.message,true);}});
+
+byId('sync-payments-btn').addEventListener('click',async()=>{
+  const button=byId('sync-payments-btn');button.disabled=true;clearNotification();
+  try{const result=await api('/api/wallet',{method:'POST',body:JSON.stringify({action:'sync'})});await reloadWallet();notify(result.credited?`${result.credited} completed payment${result.credited===1?' was':'s were'} synced and credited.`:'No uncredited captured payments were found.');}
+  catch(error){notify(error.message,true);}finally{button.disabled=walletState?.pilotMode||!walletState?.paymentsConfigured;}
+});
+byId('pricing-form').addEventListener('submit',async event=>{
+  event.preventDefault();const button=byId('save-pricing-btn');button.disabled=true;clearNotification();
+  try{const packagePrices={};for(const id of ['starter','basic','standard','growth','business'])packagePrices[id]=Number(byId(`price-${id}`).value);
+    await api('/api/wallet',{method:'POST',body:JSON.stringify({action:'save-pricing',packagePrices})});await reloadWallet();notify('Package prices saved.');}
+  catch(error){notify(error.message,true);}finally{button.disabled=false;}
+});
+
+byId('coupon-form').addEventListener('submit',async event=>{
+  event.preventDefault();const button=byId('save-coupon-btn');button.disabled=true;clearNotification();
+  try{await api('/api/wallet',{method:'POST',body:JSON.stringify({action:'save-coupon',code:byId('coupon-code').value,type:byId('coupon-type').value,
+      value:Number(byId('coupon-value').value),expiresAt:byId('coupon-expiry').value||null,maxUses:byId('coupon-max-uses').value||null,
+      minCredits:byId('coupon-min-credits').value||null,active:true})});
+    byId('coupon-form').reset();await loadCoupons();notify('Coupon saved.');}
+  catch(error){notify(error.message,true);}finally{button.disabled=false;}
+});
 byId('report-close-btn').addEventListener('click',()=>hide('report-box'));
 byId('report-print-btn').addEventListener('click',()=>{document.querySelectorAll('#report-content details').forEach(d=>d.open=true);requestAnimationFrame(()=>window.print());});
 function reportLine(parent,label,value){const p=el('p');p.append(el('strong',`${label}: `),document.createTextNode(String(value??'—')));parent.append(p);}

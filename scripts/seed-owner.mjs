@@ -12,7 +12,7 @@ if (existing.exists) {
 }
 const org = db.collection('recruiter_organizations').doc();
 const batch = db.batch();
-batch.set(org, { name, status: 'active', createdAt: new Date(), createdByUid: user.uid });
+batch.set(org, { name, status: 'active', creditBalanceUnits: 0, creditReservedUnits: 0, createdAt: new Date(), createdByUid: user.uid });
 batch.set(db.collection('recruiter_members').doc(user.uid), {
   orgId: org.id, email: user.email, role: 'owner', status: 'active', createdAt: new Date()
 });

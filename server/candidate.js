@@ -1,5 +1,6 @@
 import {candidateSession,errorResponse,requestFailure,finalizeAttempt} from './_candidate.js';
 import {buildQuestionMap,sanitizeAssessment,accrueTime,EVENT_TYPES,MAX_EVENTS} from '../lib/candidate.js';
+import {consumeReservedCredits} from './_credits.js';
 
 const response=(res,assignment,assessment)=>res.status(200).json({assessment:sanitizeAssessment(assignment,assessment)});
 export default async function handler(req,res){
@@ -32,9 +33,17 @@ export default async function handler(req,res){
         if(d.status==='completed')return {...d,id:ref.id};
         if(d.status==='started')return {...d,id:ref.id};
         if(d.status!=='verified'||d.expiresAt<Date.now())throw requestFailure('Verify your email before starting',403);
+        // Commercial invitations reserve credits when sent. Consume that reservation exactly once when the candidate starts.
+        // Legacy/pilot invitations have no reservation and remain usable without retroactive charging.
+        let creditChanges={};
+        if((Number(d.creditReservationUnits)||0)>0&&d.creditStatus==='reserved'){
+          const orgRef=db.collection('recruiter_organizations').doc(d.orgId),orgSnap=await tx.get(orgRef);
+          if(!orgSnap.exists)throw requestFailure('Recruiter credit account is unavailable',409);
+          const consumed=await consumeReservedCredits(tx,db,ref,d,orgSnap);creditChanges={creditStatus:consumed.creditStatus,creditsConsumedAt:consumed.creditsConsumedAt};
+        }
         const at=Date.now(),questionMap=buildQuestionMap(assessment.questions);
         const changes={status:'started',startedAt:at,deadlineAt:at+d.durationMinutes*60000,
-          questionMap,currentIndex:0,activeSince:at,isForeground:true,updatedAt:new Date()};
+          questionMap,currentIndex:0,activeSince:at,isForeground:true,...creditChanges,updatedAt:new Date()};
         tx.update(ref,changes);return {...d,...changes,id:ref.id};
       });
       return response(res,snap,assessment);

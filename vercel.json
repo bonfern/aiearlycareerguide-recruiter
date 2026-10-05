@@ -75,6 +75,10 @@
     {
       "source": "/api/requirements",
       "destination": "/api/router?endpoint=requirements"
+    },
+    {
+      "source": "/api/wallet",
+      "destination": "/api/router?endpoint=wallet"
     }
   ]
 }

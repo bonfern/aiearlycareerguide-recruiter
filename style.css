@@ -286,3 +286,38 @@ button:not(.secondary):not(.question-nav-item):hover:not(:disabled){background:#
   .report-timing-grid{grid-template-columns:repeat(4,1fr)!important}
   .report-insight,.report-timing-stat{break-inside:avoid-page}
 }
+
+/* V3.3: commercial credit wallet, packages and coupon administration */
+.wallet-section{margin-top:18px}
+.wallet-balances{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.wallet-stat{border:1px solid #dfe9ef;background:#f8fbfc;border-radius:11px;padding:14px 16px}
+.wallet-stat span{display:block;font-size:12px;color:#607086;margin-bottom:5px}
+.wallet-stat strong{display:block;font-size:23px;color:#071d45}
+.wallet-heading{align-items:flex-start;margin-top:18px}
+.credit-packages{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin:12px 0 18px}
+.credit-package{border:1px solid #dce7ed;background:#fff;border-radius:12px;padding:15px;display:flex;flex-direction:column;gap:8px;min-height:205px}
+.credit-package-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.credit-package h3{margin:0;font-size:15px;color:#071d45}
+.credit-package-top strong{font-size:12px;color:#087c84;white-space:nowrap}
+.credit-price{font-size:24px;font-weight:800;color:#071d45;margin:4px 0!important}
+.credit-package button{margin-top:auto;width:100%}
+.coupon-checkout-row{display:grid;grid-template-columns:minmax(220px,320px) minmax(260px,1fr);gap:18px;align-items:end;margin:14px 0 24px;padding:14px;border:1px solid #e2eaef;border-radius:10px;background:#fbfdfe}
+.coupon-status{padding-bottom:10px}
+.coupon-form-grid{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px}
+.credit-positive{font-weight:800;color:#14795d}
+.credit-negative{font-weight:800;color:#a94436}
+#coupon-admin-box{margin-top:20px}
+#coupon-admin-box .workspace-summary{background:#f8fbfc}
+@media(max-width:1050px){.credit-packages{grid-template-columns:repeat(3,minmax(160px,1fr))}.coupon-form-grid{grid-template-columns:repeat(2,minmax(180px,1fr))}}
+@media(max-width:700px){
+  .wallet-balances{grid-template-columns:1fr}
+  .credit-packages{grid-template-columns:1fr 1fr}
+  .coupon-checkout-row,.coupon-form-grid{grid-template-columns:1fr}
+  .credit-package{min-height:0}
+}
+@media(max-width:460px){.credit-packages{grid-template-columns:1fr}}
+.pricing-grid{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin:12px 0}
+.section-divider{border:0;border-top:1px solid #e2eaf0;margin:24px 0}
+@media(max-width:1050px){.pricing-grid{grid-template-columns:repeat(3,minmax(160px,1fr))}}
+@media(max-width:700px){.pricing-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:460px){.pricing-grid{grid-template-columns:1fr}}

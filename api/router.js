@@ -15,6 +15,7 @@ const handlers = {
   'public-config': () => import('../server/public-config.js'),
   'report': () => import('../server/report.js'),
   'requirements': () => import('../server/requirements.js'),
+  'wallet': () => import('../server/wallet.js'),
 };
 
 export default async function router(req, res) {

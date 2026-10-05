@@ -2,6 +2,7 @@ import {randomInt} from 'node:crypto';
 import {firebaseAdmin} from './_firebase.js';
 import {otpDigest,checkOtp,sha256,randomToken,signCandidateSession} from '../lib/candidate.js';
 import {lookupInvite,safeHtml,sendEmail,errorResponse,requestFailure} from './_candidate.js';
+import {releaseReservation} from './_credits.js';
 
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
@@ -13,11 +14,12 @@ export default async function handler(req,res){
     const job=await db.collection('recruiter_jobs').doc(item.jobId).get();
     if(!job.exists||job.data().orgId!==item.orgId)return res.status(404).json({error:'Assessment unavailable'});
     if(action==='details'){
+      if(item.expiresAt<now&&item.creditStatus==='reserved')await releaseReservation(db,ref,'invitation_expired');
       return res.status(200).json({role:job.data().title,durationMinutes:item.durationMinutes,
         expiresAt:item.expiresAt,emailHint:item.email.replace(/^(.{1,2}).*(@.*)$/,'$1***$2'),
         status:item.status==='completed'?'completed':item.expiresAt<now?'expired':'available'});
     }
-    if(item.expiresAt<now)return res.status(410).json({error:'This invitation has expired. Contact the recruiter.'});
+    if(item.expiresAt<now){if(item.creditStatus==='reserved')await releaseReservation(db,ref,'invitation_expired');return res.status(410).json({error:'This invitation has expired. Contact the recruiter.'});}
     if(item.status==='completed')return res.status(409).json({error:'This assessment is already completed'});
     if(action==='send-code'){
       if(!process.env.RESEND_API_KEY||!process.env.RECRUITER_FROM_EMAIL||!process.env.CANDIDATE_SESSION_SECRET)

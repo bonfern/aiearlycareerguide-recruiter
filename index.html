@@ -7,6 +7,7 @@
   <title>Recruiter Assessment | AI Early Career Guide</title>
   <link rel="icon" type="image/png" href="/assets/brand-icon.png" />
   <link rel="stylesheet" href="/style.css" />
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script type="module" src="/app.js"></script>
 </head>
 <body>
@@ -40,6 +41,55 @@
         <div class="stat"><span>Candidates</span><strong id="total-candidates">0</strong></div>
         <div class="stat"><span>Completed</span><strong id="total-completed">0</strong></div>
       </div>
+      <details id="wallet-box" class="card workspace-section wallet-section" open>
+        <summary class="workspace-summary"><span><strong>Credit Wallet</strong><small>Buy assessment credits and review usage</small></span><span class="tag" id="wallet-summary">0 credits available</span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
+        <div class="workspace-content">
+          <div class="wallet-balances">
+            <div class="wallet-stat"><span>Available Credits</span><strong id="wallet-available">0</strong></div>
+            <div class="wallet-stat"><span>Reserved for Invitations</span><strong id="wallet-reserved">0</strong></div>
+            <div class="wallet-stat"><span>Total Credit Balance</span><strong id="wallet-balance">0</strong></div>
+          </div>
+          <div id="pilot-wallet-note" class="callout hidden">Pilot mode is enabled. Candidate assessments do not consume credits until commercial mode is activated.</div>
+          <div class="section-head wallet-heading"><div><h2>Buy Credits</h2><p class="muted fine">Minimum purchase: 5 credits. Larger packages have a lower cost per credit.</p></div><button id="sync-payments-btn" class="secondary compact" type="button">Sync Recent Payments</button></div>
+          <div id="credit-packages" class="credit-packages"></div>
+          <div class="coupon-checkout-row"><div><label for="checkout-coupon">Coupon Code (Optional)</label><input id="checkout-coupon" maxlength="32" autocomplete="off" placeholder="Enter coupon" /></div><div class="coupon-status"><span class="muted fine" id="checkout-note">Select a package to continue.</span></div></div>
+          <h2>Credit Activity</h2>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Activity</th><th>Credits</th><th>Details</th></tr></thead><tbody id="credit-activity"></tbody></table></div>
+          <p id="credit-empty" class="muted fine">No credit activity yet.</p>
+          <details id="coupon-admin-box" class="workspace-section hidden">
+            <summary class="workspace-summary"><span><strong>Coupon Management</strong><small>Platform administrator only</small></span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
+            <div class="workspace-content">
+              <h3>Package Pricing</h3>
+              <p class="muted fine">Update package prices without changing the application code. Credit quantities remain fixed.</p>
+              <form id="pricing-form">
+                <div class="pricing-grid">
+                  <div><label for="price-starter">Starter · 5 Credits (₹)</label><input id="price-starter" type="number" min="100" step="1" required /></div>
+                  <div><label for="price-basic">Basic · 10 Credits (₹)</label><input id="price-basic" type="number" min="100" step="1" required /></div>
+                  <div><label for="price-standard">Standard · 20 Credits (₹)</label><input id="price-standard" type="number" min="100" step="1" required /></div>
+                  <div><label for="price-growth">Growth · 50 Credits (₹)</label><input id="price-growth" type="number" min="100" step="1" required /></div>
+                  <div><label for="price-business">Business · 100 Credits (₹)</label><input id="price-business" type="number" min="100" step="1" required /></div>
+                </div>
+                <div class="actions"><button type="submit" id="save-pricing-btn">Save Package Prices</button></div>
+              </form>
+              <hr class="section-divider" />
+              <h3>Coupon Management</h3>
+              <form id="coupon-form">
+                <div class="coupon-form-grid">
+                  <div><label for="coupon-code">Coupon Code</label><input id="coupon-code" required maxlength="32" placeholder="WELCOME10" /></div>
+                  <div><label for="coupon-type">Discount Type</label><select id="coupon-type" class="compact-select"><option value="percent">Percentage</option><option value="fixed">Fixed Amount (₹)</option></select></div>
+                  <div><label for="coupon-value">Discount Value</label><input id="coupon-value" required type="number" min="1" step="0.01" /></div>
+                  <div><label for="coupon-expiry">Expiry Date (Optional)</label><input id="coupon-expiry" type="date" /></div>
+                  <div><label for="coupon-max-uses">Maximum Uses (Optional)</label><input id="coupon-max-uses" type="number" min="1" step="1" /></div>
+                  <div><label for="coupon-min-credits">Minimum Package Credits (Optional)</label><select id="coupon-min-credits" class="compact-select"><option value="">Any package</option><option value="5">5+</option><option value="10">10+</option><option value="20">20+</option><option value="50">50+</option><option value="100">100</option></select></div>
+                </div>
+                <div class="actions"><button type="submit" id="save-coupon-btn">Save Coupon</button></div>
+              </form>
+              <div class="table-wrap"><table><thead><tr><th>Code</th><th>Discount</th><th>Uses</th><th>Expiry</th><th>Status</th><th>Action</th></tr></thead><tbody id="coupon-table"></tbody></table></div>
+            </div>
+          </details>
+        </div>
+      </details>
+
       <details class="card dashboard-jobs" open>
         <summary class="workspace-summary"><span><strong>My jobs</strong><small>Search and manage your assessments</small></span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
         <div class="dashboard-jobs-content">
@@ -122,7 +172,7 @@
         <summary class="workspace-summary"><span><small>STEP 4</small><strong>Candidates and Reports</strong></span><span class="tag" id="candidate-total">0 candidates</span><span class="disclosure-icon" aria-hidden="true">⌄</span></summary>
         <div class="workspace-content">
 
-        <div class="callout">Each candidate gets a unique invitation, email OTP and a timed assessment. Browser activity is logged but is <strong>not proof of misconduct</strong>. This pilot is limited to 5 candidates per JD until payment credits are enabled.</div>
+        <div class="callout" id="candidate-credit-note">Each candidate gets a unique invitation, email OTP and a timed assessment. Browser activity is logged but is <strong>not proof of misconduct</strong>.</div>
         <div class="duration-control"><label for="assessment-duration">Overall Assessment Duration (Minutes)</label>
           <div class="actions"><input id="assessment-duration" type="number" min="10" max="120" step="1" value="40" />
           <button class="secondary" type="button" id="save-duration-btn">Save duration</button></div>
